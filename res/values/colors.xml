@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="messagecolor">#000000</color>
+    <color name="irmablue">#00b1e6</color>
+    <color name="irmadarkblue">#004289</color>
+    <color name="irmagrey">#d0d0d0</color>
+    <color name="irmadarkgrey">#888888</color>
+    <color name="irmagreen">#a4ba00</color>
+    <color name="irmaorange">#f6a800</color>
+    <color name="irmared">#e53434</color>
+</resources>

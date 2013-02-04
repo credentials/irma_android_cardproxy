@@ -7,6 +7,12 @@
 	<string name="irmalogo">IRMA logo</string>
 	<string name="credential_info">Card Proxy</string>
 	<string name="status_waiting">Waiting for request</string>
+	<string name="status_waiting">Waiting for card</string>
+	<string name="status_checking">Checking credentials</string>
+	<string name="status_ok">Credential found</string>
+	<string name="status_missing">Credential missing</string>
+	<string name="status_warning">Try again</string>
+	<string name="status_idle">Tap to scan QR</string>
 	
 	
 </resources>

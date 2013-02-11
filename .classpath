@@ -7,5 +7,6 @@
 	<classpathentry kind="lib" path="libs/android-async-http-1.4.3.jar"/>
 	<classpathentry combineaccessrules="false" exported="true" kind="src" path="/idemix_terminal"/>
 	<classpathentry kind="lib" path="libs/gson-2.2.2.jar"/>
+	<classpathentry combineaccessrules="false" exported="true" kind="src" path="/idemix_library"/>
 	<classpathentry kind="output" path="bin/classes"/>
 </classpath>

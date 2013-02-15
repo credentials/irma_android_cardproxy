@@ -13,6 +13,8 @@
 	<string name="status_missing">Credential missing</string>
 	<string name="status_warning">Try again</string>
 	<string name="status_idle">Tap to scan QR</string>
+	<string name="pinhint">PIN</string>
+	<string name="pinmessage">Please enter your IRMA pincode</string>
 	
 	
 </resources>

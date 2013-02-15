@@ -12,6 +12,7 @@ import net.sourceforge.scuba.smartcards.IsoDepCardService;
 import net.sourceforge.scuba.smartcards.ResponseAPDU;
 
 import org.apache.http.entity.StringEntity;
+import org.irmacard.androidcardproxy.EnterPINDialogFragment.PINDialogListener;
 import org.json.JSONException;
 
 import service.IdemixService;
@@ -37,20 +38,28 @@ import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.Message;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.Dialog;
+import android.app.DialogFragment;
 import android.app.PendingIntent;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.text.InputType;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.View;
+import android.view.WindowManager;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.loopj.android.http.*;
 
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements PINDialogListener {
 	private NfcAdapter nfcA;
 	private PendingIntent mPendingIntent;
 	private IntentFilter[] mFilters;
@@ -179,10 +188,12 @@ public class MainActivity extends Activity {
 	}
 	
 	public void onMainTouch(View v) {
-		if (activityState == STATE_IDLE) {
-			lastTag = null;
-			startQRScanner("Scan the QR image in the browser.");
-		}
+		// test code
+		askForPIN();
+//		if (activityState == STATE_IDLE) {
+//			lastTag = null;
+//			startQRScanner("Scan the QR image in the browser.");
+//		}
 	}
 	
     @Override
@@ -246,10 +257,18 @@ public class MainActivity extends Activity {
 		if (activityState == STATE_WAITING && lastTag != null && tagReadyForProcessing) {
 			setState(STATE_CHECKING);
 			tagReadyForProcessing = false;
+			if (lastCommandSet.usePIN) {
+				byte[] pin = askForPIN();
+			}
 			new ProcessCommandSet().execute(new SmartcardProxyInput(lastCommandSet, lastTag));
 		}
 	}
 	
+	public byte[] askForPIN() {
+		DialogFragment newFragment = new EnterPINDialogFragment();
+	    newFragment.show(getFragmentManager(), "pinentry");
+		return null;
+	}
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		// Inflate the menu; this adds items to the action bar if it is present.
@@ -275,6 +294,8 @@ public class MainActivity extends Activity {
 		public CommandSet cs;
 		public ProtocolResponses responses;
 	}
+	
+
 	
 	private class ProcessCommandSet extends AsyncTask<SmartcardProxyInput, Void, SmartcardProxyOutput> {
 
@@ -312,7 +333,7 @@ public class MainActivity extends Activity {
 		
 		@Override
 		protected void onPostExecute(SmartcardProxyOutput result) {
-			// This is execute in the main UI thread
+			// This is executed in the main UI thread
 			Gson gson = new GsonBuilder().
 					setPrettyPrinting().
 					registerTypeAdapter(ProtocolResponse.class, new ProtocolResponseSerializer()).
@@ -341,5 +362,18 @@ public class MainActivity extends Activity {
 				e.printStackTrace();
 			}
 		}
+	}
+
+
+
+	@Override
+	public void onPINEntry(String pincode) {
+		Log.i(TAG, "PIN entered: " + pincode);
+		
+	}
+
+	@Override
+	public void onPINCancel() {
+		Log.i(TAG, "PIN entry canceled!");
 	}
 }

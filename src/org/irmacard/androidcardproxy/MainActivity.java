@@ -1,76 +1,68 @@
 package org.irmacard.androidcardproxy;
 
 import java.io.UnsupportedEncodingException;
-import java.util.Currency;
-import java.util.Iterator;
 
-import net.sourceforge.scuba.smartcards.CardService;
 import net.sourceforge.scuba.smartcards.CardServiceException;
-import net.sourceforge.scuba.smartcards.CommandAPDU;
-import net.sourceforge.scuba.smartcards.ISO7816;
 import net.sourceforge.scuba.smartcards.IsoDepCardService;
-import net.sourceforge.scuba.smartcards.ResponseAPDU;
 
 import org.apache.http.entity.StringEntity;
+import org.irmacard.androidcardproxy.ConfirmationDialogFragment.ConfirmationDialogListener;
 import org.irmacard.androidcardproxy.EnterPINDialogFragment.PINDialogListener;
 import org.json.JSONException;
 
 import service.IdemixService;
-import service.IdemixSmartcard;
 import service.ProtocolCommand;
 import service.ProtocolResponse;
 import service.ProtocolResponses;
-
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.zxing.integration.android.IntentIntegrator;
-import com.google.zxing.integration.android.IntentResult;
-
-import android.net.nsd.NsdManager;
-import android.net.nsd.NsdManager.RegistrationListener;
-import android.net.nsd.NsdServiceInfo;
+import android.app.Activity;
+import android.app.DialogFragment;
+import android.app.PendingIntent;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.nfc.tech.IsoDep;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.CountDownTimer;
-import android.os.Handler;
-import android.os.Message;
-import android.app.Activity;
-import android.app.AlertDialog;
-import android.app.Dialog;
-import android.app.DialogFragment;
-import android.app.PendingIntent;
-import android.content.Context;
-import android.content.DialogInterface;
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.text.InputType;
 import android.util.Log;
-import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.View;
-import android.view.WindowManager;
-import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import com.loopj.android.http.*;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.zxing.integration.android.IntentIntegrator;
+import com.google.zxing.integration.android.IntentResult;
+import com.loopj.android.http.AsyncHttpClient;
+import com.loopj.android.http.AsyncHttpResponseHandler;
+import com.loopj.android.http.JsonHttpResponseHandler;
 
 
-public class MainActivity extends Activity implements PINDialogListener {
+public class MainActivity extends Activity implements PINDialogListener, ConfirmationDialogListener {
+	private String TAG = "CardProxyMainActivity";
 	private NfcAdapter nfcA;
 	private PendingIntent mPendingIntent;
 	private IntentFilter[] mFilters;
 	private String[][] mTechLists;
+
+	
+	
+	// State variables
 	private IsoDep lastTag = null;
 	private CommandSet lastCommandSet = null;
-	
-	private String TAG = "CardProxyMainActivity";
-	
 	private boolean tagReadyForProcessing = false;
+	private boolean confirmationGiven = false;
+	private boolean pinSet = false;
+	private String pinCode = "";
 
+	private void resetState() {
+		confirmationGiven = false;
+		pinSet = false;
+		pinCode = "";
+	}
+	
 	
 	private int activityState = STATE_WAITING;
 	
@@ -189,11 +181,11 @@ public class MainActivity extends Activity implements PINDialogListener {
 	
 	public void onMainTouch(View v) {
 		// test code
-		askForPIN();
-//		if (activityState == STATE_IDLE) {
-//			lastTag = null;
-//			startQRScanner("Scan the QR image in the browser.");
-//		}
+//		askForPIN();
+		if (activityState == STATE_IDLE) {
+			lastTag = null;
+			startQRScanner("Scan the QR image in the browser.");
+		}
 	}
 	
     @Override
@@ -207,7 +199,7 @@ public class MainActivity extends Activity implements PINDialogListener {
     	IsoDep tag = IsoDep.get(tagFromIntent);
     	if (tag != null) {
     		lastTag = tag;
-    		tryVerification();
+    		tryNextStep();
     	}    	
     }
 	
@@ -239,7 +231,7 @@ public class MainActivity extends Activity implements PINDialogListener {
 							create();
 					lastCommandSet = gson.fromJson(response,CommandSet.class);
 					setState(STATE_WAITING);
-					tryVerification();
+					tryNextStep();
 			    }
 			    @Override
 			    public void onFailure(Throwable arg0, String arg1) {
@@ -252,23 +244,31 @@ public class MainActivity extends Activity implements PINDialogListener {
 		}
 
 	}
+
 	
-	public void tryVerification() {
-		if (activityState == STATE_WAITING && lastTag != null && tagReadyForProcessing) {
+	public void tryNextStep() {
+		if (lastCommandSet != null && lastCommandSet.askConfirmation && !confirmationGiven) {
+			askConfirmation(lastCommandSet.confirmationMessage);
+		} else if (lastCommandSet != null && lastCommandSet.usePIN && !pinSet) {
+			askForPIN();
+		} else if (activityState == STATE_WAITING && lastTag != null && tagReadyForProcessing) {
 			setState(STATE_CHECKING);
 			tagReadyForProcessing = false;
-			if (lastCommandSet.usePIN) {
-				byte[] pin = askForPIN();
-			}
+			
 			new ProcessCommandSet().execute(new SmartcardProxyInput(lastCommandSet, lastTag));
 		}
 	}
 	
-	public byte[] askForPIN() {
+	public void askForPIN() {
 		DialogFragment newFragment = new EnterPINDialogFragment();
 	    newFragment.show(getFragmentManager(), "pinentry");
-		return null;
 	}
+	
+	public void askConfirmation(String message) {
+		DialogFragment newFragment = ConfirmationDialogFragment.newInstance(message);
+		newFragment.show(getFragmentManager(), "confirmation");
+	}
+	
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		// Inflate the menu; this adds items to the action bar if it is present.
@@ -340,6 +340,7 @@ public class MainActivity extends Activity implements PINDialogListener {
 					create();
 			
 			String httpresult = gson.toJson(result.responses);
+			Log.i(TAG,"Sending card responses to " + result.cs.responseurl);
 			AsyncHttpClient client = new AsyncHttpClient();
 			try {
 				client.post(MainActivity.this, result.cs.responseurl, new StringEntity(httpresult) , "application/json",  new JsonHttpResponseHandler() { 
@@ -367,13 +368,30 @@ public class MainActivity extends Activity implements PINDialogListener {
 
 
 	@Override
-	public void onPINEntry(String pincode) {
-		Log.i(TAG, "PIN entered: " + pincode);
-		
+	public void onPINEntry(String dialogPincode) {
+		Log.i(TAG, "PIN entered: " + dialogPincode);
+		pinSet = true;
+		pinCode = dialogPincode;
+		tryNextStep();
 	}
 
 	@Override
 	public void onPINCancel() {
 		Log.i(TAG, "PIN entry canceled!");
+		setState(STATE_IDLE);
+		resetState();
 	}
+
+	@Override
+	public void onConfirmationPositive() {
+		confirmationGiven = true;
+		tryNextStep();
+	}
+
+	@Override
+	public void onConfirmationNegative() {
+		resetState();
+		setState(STATE_IDLE);
+	}
+	
 }

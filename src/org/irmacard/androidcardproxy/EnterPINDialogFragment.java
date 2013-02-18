@@ -54,7 +54,7 @@ public class EnterPINDialogFragment extends DialogFragment {
         super.onAttach(activity);
         // Verify that the host activity implements the callback interface
         try {
-            // Instantiate the NoticeDialogListener so we can send events to the host
+            // Instantiate the PINDialogListener so we can send events to the host
             mListener = (PINDialogListener) activity;
         } catch (ClassCastException e) {
             // The activity doesn't implement the interface, throw exception

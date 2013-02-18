@@ -51,16 +51,16 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 	
 	// State variables
 	private IsoDep lastTag = null;
-	private CommandSet lastCommandSet = null;
+	private ProtocolStep lastCommandSet = null;
 	private boolean tagReadyForProcessing = false;
 	private boolean confirmationGiven = false;
 	private boolean pinSet = false;
-	private String pinCode = "";
+	private String pinCode = null;
 
 	private void resetState() {
 		confirmationGiven = false;
 		pinSet = false;
-		pinCode = "";
+		pinCode = null;
 	}
 	
 	
@@ -229,7 +229,7 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 							setPrettyPrinting().
 							registerTypeAdapter(ProtocolCommand.class, new ProtocolCommandDeserializer()).
 							create();
-					lastCommandSet = gson.fromJson(response,CommandSet.class);
+					lastCommandSet = gson.fromJson(response,ProtocolStep.class);
 					setState(STATE_WAITING);
 					tryNextStep();
 			    }
@@ -247,15 +247,16 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 
 	
 	public void tryNextStep() {
+		Log.i(TAG,"Try next step.");
 		if (lastCommandSet != null && lastCommandSet.askConfirmation && !confirmationGiven) {
 			askConfirmation(lastCommandSet.confirmationMessage);
 		} else if (lastCommandSet != null && lastCommandSet.usePIN && !pinSet) {
 			askForPIN();
 		} else if (activityState == STATE_WAITING && lastTag != null && tagReadyForProcessing) {
+			Log.i(TAG,"Trying to execute card commands.");
 			setState(STATE_CHECKING);
-			tagReadyForProcessing = false;
 			
-			new ProcessCommandSet().execute(new SmartcardProxyInput(lastCommandSet, lastTag));
+			new ProcessCommandSet().execute(new SmartcardProxyInput(lastCommandSet, lastTag, pinCode));
 		}
 	}
 	
@@ -282,27 +283,36 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 	}
 	
 	private class SmartcardProxyInput {
-		public CommandSet cs;
+		public ProtocolStep cs;
 		public IsoDep tag;
-		SmartcardProxyInput(CommandSet cs, IsoDep tag) {
+		public String pincode;
+		SmartcardProxyInput(ProtocolStep cs, IsoDep tag, String pincode) {
 			this.cs = cs;
 			this.tag = tag;
+			this.pincode = pincode;
 		}
 	}
 	
 	private class SmartcardProxyOutput {
-		public CommandSet cs;
+		public ProtocolStep cs;
 		public ProtocolResponses responses;
 	}
 	
-
+	public static byte[] string2bytepin(String pincode) {
+		byte[] result = new byte[pincode.length()];
+		for (int i = 0; i < pincode.length(); i++) {
+			result[i] = (byte)(pincode.charAt(i));
+		}
+		return result;
+	}
 	
 	private class ProcessCommandSet extends AsyncTask<SmartcardProxyInput, Void, SmartcardProxyOutput> {
 
 		@Override
 		protected SmartcardProxyOutput doInBackground(SmartcardProxyInput... params) {
 			IsoDep tag = params[0].tag;
-			CommandSet cs = params[0].cs;
+			ProtocolStep cs = params[0].cs;
+			String pincode = params[0].pincode;
 			
 			// Make sure time-out is long enough (10 seconds)
 			tag.setTimeout(10000);
@@ -313,14 +323,18 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 			smartcardOutput.cs = cs;
 			smartcardOutput.responses = new ProtocolResponses();
 			try {
-				is.open();
-				is.selectApplet();
+				if (!is.isOpen()) {
+					is.open();
+				}
+				if (pincode != null) {
+					is.sendPin(string2bytepin(pincode));
+				}
 				
 				for (ProtocolCommand c : cs.commands) {
 					smartcardOutput.responses.put(c.getKey(), 
 							new ProtocolResponse(c.getKey(), is.transmit(c.getAPDU())));
 				}
-				is.close(); 
+//				is.close(); 
 			} catch (CardServiceException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -343,21 +357,34 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 			Log.i(TAG,"Sending card responses to " + result.cs.responseurl);
 			AsyncHttpClient client = new AsyncHttpClient();
 			try {
-				client.post(MainActivity.this, result.cs.responseurl, new StringEntity(httpresult) , "application/json",  new JsonHttpResponseHandler() { 
-					public void onSuccess(org.json.JSONObject jsonobj) {
-						try {
-							String response = jsonobj.getString("response");
-							if (response.equals("valid")) {
-								setState(STATE_RESULT_OK);
+				client.post(MainActivity.this, result.cs.responseurl, new StringEntity(httpresult) , "application/json",  new AsyncHttpResponseHandler() {
+					@Override
+					public void onSuccess(String response) {
+						Log.i(TAG,response);
+						Gson gson = new GsonBuilder().
+								setPrettyPrinting().
+								registerTypeAdapter(ProtocolCommand.class, new ProtocolCommandDeserializer()).
+								create();
+						lastCommandSet = gson.fromJson(response,ProtocolStep.class);
+						if (lastCommandSet.protocolDone) {
+							tagReadyForProcessing = false;
+							if (lastCommandSet.result != null) {
+								if (lastCommandSet.result.equals("valid")) {
+									setState(STATE_RESULT_OK);
+								} else {
+									setState(STATE_RESULT_MISSING);
+								}
 							} else {
-								setState(STATE_RESULT_MISSING);
+								setState(STATE_RESULT_OK);
 							}
-							lastCommandSet = null;
-							lastTag = null;
-						} catch (JSONException e) {
-							e.printStackTrace();
+						} else {
+							setState(STATE_WAITING);
+							tryNextStep();
+							resetState();
 						}
-					};
+						
+					}
+					
 				});
 			} catch (UnsupportedEncodingException e) {
 				e.printStackTrace();

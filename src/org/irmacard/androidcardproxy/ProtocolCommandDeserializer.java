@@ -2,11 +2,8 @@ package org.irmacard.androidcardproxy;
 
 import java.lang.reflect.Type;
 
-import service.ProtocolCommand;
-import service.ProtocolResponse;
-
 import net.sourceforge.scuba.smartcards.CommandAPDU;
-import net.sourceforge.scuba.smartcards.ResponseAPDU;
+import net.sourceforge.scuba.smartcards.ProtocolCommand;
 import net.sourceforge.scuba.util.Hex;
 
 import com.google.gson.JsonDeserializationContext;

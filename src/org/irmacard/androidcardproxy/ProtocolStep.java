@@ -2,7 +2,7 @@ package org.irmacard.androidcardproxy;
 
 import java.util.List;
 
-import service.ProtocolCommand;
+import net.sourceforge.scuba.smartcards.ProtocolCommand;
 
 public class ProtocolStep {
     public List<ProtocolCommand> commands = null;

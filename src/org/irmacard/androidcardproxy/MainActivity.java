@@ -4,16 +4,15 @@ import java.io.UnsupportedEncodingException;
 
 import net.sourceforge.scuba.smartcards.CardServiceException;
 import net.sourceforge.scuba.smartcards.IsoDepCardService;
+import net.sourceforge.scuba.smartcards.ProtocolCommand;
+import net.sourceforge.scuba.smartcards.ProtocolResponse;
+import net.sourceforge.scuba.smartcards.ProtocolResponses;
 
 import org.apache.http.entity.StringEntity;
 import org.irmacard.androidcardproxy.ConfirmationDialogFragment.ConfirmationDialogListener;
 import org.irmacard.androidcardproxy.EnterPINDialogFragment.PINDialogListener;
-import org.json.JSONException;
+import org.irmacard.idemix.IdemixService;
 
-import service.IdemixService;
-import service.ProtocolCommand;
-import service.ProtocolResponse;
-import service.ProtocolResponses;
 import android.app.Activity;
 import android.app.DialogFragment;
 import android.app.PendingIntent;
@@ -37,7 +36,6 @@ import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
 import com.loopj.android.http.AsyncHttpClient;
 import com.loopj.android.http.AsyncHttpResponseHandler;
-import com.loopj.android.http.JsonHttpResponseHandler;
 
 
 public class MainActivity extends Activity implements PINDialogListener, ConfirmationDialogListener {
@@ -377,10 +375,10 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 							} else {
 								setState(STATE_RESULT_OK);
 							}
+							resetState();
 						} else {
 							setState(STATE_WAITING);
 							tryNextStep();
-							resetState();
 						}
 						
 					}

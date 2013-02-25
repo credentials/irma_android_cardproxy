@@ -2,9 +2,8 @@ package org.irmacard.androidcardproxy;
 
 import java.lang.reflect.Type;
 
+import net.sourceforge.scuba.smartcards.ProtocolResponse;
 import net.sourceforge.scuba.util.Hex;
-import service.ProtocolCommand;
-import service.ProtocolResponse;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;

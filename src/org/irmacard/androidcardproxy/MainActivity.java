@@ -80,6 +80,8 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
     	activityState = state;
     	int imageResource = 0;
     	int statusTextResource = 0;
+    	boolean useResource = true;
+    	String statusTextString = "";
     	switch (activityState) {
     	case STATE_WAITING:
     		imageResource = R.drawable.irma_icon_place_card_520px;
@@ -88,6 +90,10 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 		case STATE_CHECKING:
 			imageResource = R.drawable.irma_icon_card_found_520px;
 			statusTextResource = R.string.status_checking;
+			if (lastCommandSet != null && lastCommandSet.feedbackMessage != null) {
+				useResource = false;
+				statusTextString = lastCommandSet.feedbackMessage;
+			}
 			break;
 		case STATE_RESULT_OK:
 			imageResource = R.drawable.irma_icon_ok_520px;
@@ -129,7 +135,11 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
         	  }.start();
     	}
     	
-    	((TextView)findViewById(R.id.statustext)).setText(statusTextResource);
+    	if (useResource) {
+    		((TextView)findViewById(R.id.statustext)).setText(statusTextResource);
+    	} else {
+    		((TextView)findViewById(R.id.statustext)).setText(statusTextString);
+    	}
 		((ImageView)findViewById(R.id.statusimage)).setImageResource(imageResource);
 	}
 	
@@ -294,6 +304,7 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 	private class SmartcardProxyOutput {
 		public ProtocolStep cs;
 		public ProtocolResponses responses;
+		Exception errorException = null;
 	}
 	
 	public static byte[] string2bytepin(String pincode) {
@@ -334,7 +345,7 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 				}
 //				is.close(); 
 			} catch (CardServiceException e) {
-				// TODO Auto-generated catch block
+				smartcardOutput.errorException = e;
 				e.printStackTrace();
 			}
 			
@@ -350,42 +361,53 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 					setPrettyPrinting().
 					registerTypeAdapter(ProtocolResponse.class, new ProtocolResponseSerializer()).
 					create();
-			
-			String httpresult = gson.toJson(result.responses);
-			Log.i(TAG,"Sending card responses to " + result.cs.responseurl);
-			AsyncHttpClient client = new AsyncHttpClient();
-			try {
-				client.post(MainActivity.this, result.cs.responseurl, new StringEntity(httpresult) , "application/json",  new AsyncHttpResponseHandler() {
-					@Override
-					public void onSuccess(String response) {
-						Log.i(TAG,response);
-						Gson gson = new GsonBuilder().
-								setPrettyPrinting().
-								registerTypeAdapter(ProtocolCommand.class, new ProtocolCommandDeserializer()).
-								create();
-						lastCommandSet = gson.fromJson(response,ProtocolStep.class);
-						if (lastCommandSet.protocolDone) {
-							tagReadyForProcessing = false;
-							if (lastCommandSet.result != null) {
-								if (lastCommandSet.result.equals("valid")) {
-									setState(STATE_RESULT_OK);
+			if (result.errorException != null) {
+				setState(STATE_RESULT_WARNING);
+				resetState();
+				tagReadyForProcessing = false;
+			} else {
+				String httpresult = gson.toJson(result.responses);
+				Log.i(TAG,"Sending card responses to " + result.cs.responseurl);
+				AsyncHttpClient client = new AsyncHttpClient();
+				try {
+					client.post(MainActivity.this, result.cs.responseurl, new StringEntity(httpresult) , "application/json",  new AsyncHttpResponseHandler() {
+						@Override
+						public void onSuccess(String response) {
+							Log.i(TAG,response);
+							Gson gson = new GsonBuilder().
+									setPrettyPrinting().
+									registerTypeAdapter(ProtocolCommand.class, new ProtocolCommandDeserializer()).
+									create();
+							lastCommandSet = gson.fromJson(response,ProtocolStep.class);
+							if (lastCommandSet.protocolDone) {
+								tagReadyForProcessing = false;
+								if (lastCommandSet.status != null) {
+									if (lastCommandSet.status.equals("success")) {
+										setState(STATE_RESULT_OK);
+									} else {
+										setState(STATE_RESULT_MISSING);
+									}
 								} else {
 									setState(STATE_RESULT_MISSING);
 								}
+								if (lastCommandSet.feedbackMessage != null) {
+									((TextView)findViewById(R.id.statustext)).setText(lastCommandSet.feedbackMessage);
+								}
+								resetState();
 							} else {
-								setState(STATE_RESULT_OK);
+								setState(STATE_WAITING);
+								if (lastCommandSet.feedbackMessage != null) {
+									((TextView)findViewById(R.id.statustext)).setText(lastCommandSet.feedbackMessage);
+								}
+								tryNextStep();
 							}
-							resetState();
-						} else {
-							setState(STATE_WAITING);
-							tryNextStep();
+							
 						}
 						
-					}
-					
-				});
-			} catch (UnsupportedEncodingException e) {
-				e.printStackTrace();
+					});
+				} catch (UnsupportedEncodingException e) {
+					e.printStackTrace();
+				}
 			}
 		}
 	}

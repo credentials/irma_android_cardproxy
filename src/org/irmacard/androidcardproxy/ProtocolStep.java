@@ -5,13 +5,18 @@ import java.util.List;
 import net.sourceforge.scuba.smartcards.ProtocolCommand;
 
 public class ProtocolStep {
-    public List<ProtocolCommand> commands = null;
-    public String responseurl = null;
-    public boolean usePIN = false;
-    public String feedbackMessage = null;
-    public String confirmationMessage = null;
-    public boolean askConfirmation = false;
+	public String status;
+    public List<ProtocolCommand> commands;
+    public String responseurl;
+
     public boolean protocolDone = false;
+
+    public boolean usePIN = false;
+
+    public boolean askConfirmation = false;
+    public String confirmationMessage;
+    
+    public String feedbackMessage;
+    
     public String result = null;
-    public String data = null;   
 }

@@ -1,0 +1,12 @@
+idemix_terminal
+
+SCUBA (LGPL 3.0)
+  Utilities for smart card interaction.
+
+Identity Mixer 2.3.4 (Identity Mixer License 1.2)
+  Idemix cryptographic library.
+
+Idemix patches (MIT)
+  Patches for the Identity Mixer library providing bugfixes and smart
+  card compatability.
+

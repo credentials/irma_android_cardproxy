@@ -18,6 +18,7 @@ import android.app.DialogFragment;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.Uri;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.nfc.tech.IsoDep;
@@ -44,6 +45,7 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 	private PendingIntent mPendingIntent;
 	private IntentFilter[] mFilters;
 	private String[][] mTechLists;
+	private boolean fromLink = false;
 
 	
 	
@@ -59,6 +61,11 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 		confirmationGiven = false;
 		pinSet = false;
 		pinCode = null;
+		if (fromLink) {
+			fromLink = false;
+			// If the app was opened from a URL, go back (to the browser?) by closing this activity.
+			finish();
+		}
 	}
 	
 	
@@ -174,9 +181,17 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 	@Override
 	protected void onResume() {
         super.onResume();
+        Log.i(TAG, "Action: " + getIntent().getAction());
         if (NfcAdapter.ACTION_TECH_DISCOVERED.equals(getIntent().getAction())) {
             processIntent(getIntent());
-        }        
+        } else if (Intent.ACTION_VIEW.equals(getIntent().getAction()) && "cardproxy".equals(getIntent().getScheme())) {
+        	Log.i(TAG,"From link!");
+        	Uri uri = getIntent().getData();
+        	fromLink = true;
+        	String startURL = "http://" + uri.getHost() + ":" + uri.getPort() + uri.getPath();
+        	Log.i(TAG, "Start URL: " + startURL);
+        	doInitialRequest(startURL);
+        }
         if (nfcA != null) {
         	nfcA.enableForegroundDispatch(this, mPendingIntent, mFilters, mTechLists);
         }

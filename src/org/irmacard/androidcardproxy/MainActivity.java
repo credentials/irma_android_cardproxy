@@ -9,8 +9,9 @@ import net.sourceforge.scuba.smartcards.ProtocolResponse;
 import net.sourceforge.scuba.smartcards.ProtocolResponses;
 
 import org.apache.http.entity.StringEntity;
+import org.irmacard.android.util.pindialog.EnterPINDialogFragment;
+import org.irmacard.android.util.pindialog.EnterPINDialogFragment.PINDialogListener;
 import org.irmacard.androidcardproxy.ConfirmationDialogFragment.ConfirmationDialogListener;
-import org.irmacard.androidcardproxy.EnterPINDialogFragment.PINDialogListener;
 import org.irmacard.idemix.IdemixService;
 
 import android.app.Activity;

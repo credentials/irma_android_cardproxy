@@ -80,6 +80,7 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 	private static final int STATE_RESULT_OK = 2;
 	private static final int STATE_RESULT_MISSING = 3;
 	private static final int STATE_RESULT_WARNING = 4;
+	private static final int STATE_CONNECTING_TO_SERVER = 5;
 	private static final int STATE_IDLE = 10;
 	
 	private CountDownTimer cdt = null;
@@ -122,6 +123,11 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 			imageResource = R.drawable.irma_icon_place_card_520px;
 			statusTextResource = R.string.status_idle;
 			lastTag = null;
+			break;
+		case STATE_CONNECTING_TO_SERVER:
+			imageResource = R.drawable.irma_icon_place_card_520px;
+			statusTextResource = R.string.connectserver;
+			break;
 		default:
 			break;
 		}
@@ -245,7 +251,7 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 	}
 	
 	public void doInitialRequest(String startURL) {
-
+		setState(STATE_CONNECTING_TO_SERVER);
 		AsyncHttpClient client = new AsyncHttpClient();
 		try {
 			client.post(this, startURL, new StringEntity("") , "application/json",  new AsyncHttpResponseHandler() {

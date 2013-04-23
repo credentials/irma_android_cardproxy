@@ -15,8 +15,11 @@ import org.irmacard.androidcardproxy.ConfirmationDialogFragment.ConfirmationDial
 import org.irmacard.idemix.IdemixService;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.Dialog;
 import android.app.DialogFragment;
 import android.app.PendingIntent;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.Uri;
@@ -259,8 +262,11 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 			    }
 			    @Override
 			    public void onFailure(Throwable arg0, String arg1) {
-			    	// TODO: feedback to user that command failed!
-			    	Log.e(TAG, "Failure: " + arg1);
+			    	Log.e(TAG, "Failure: " + arg1 + "(" +arg0.getMessage() +  ")");
+					DialogFragment newFragment = ErrorFeedbackDialogFragment.newInstance("Connection Error", "There has been an error connecting to the Relying Party's webserver: " + arg0.getMessage());
+					newFragment.show(getFragmentManager(), "error");
+					setState(STATE_IDLE);
+					resetState();
 				}
 			});
 		} catch (UnsupportedEncodingException e) {
@@ -419,6 +425,13 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 							}
 							
 						}
+						@Override
+						public void onFailure(Throwable arg0, String arg1) {
+							DialogFragment newFragment = ErrorFeedbackDialogFragment.newInstance("Connection Error", "There has been an error connecting to the Relying Party's webserver: " + arg0.getMessage());
+							newFragment.show(getFragmentManager(), "error");
+							setState(STATE_IDLE);
+							resetState();
+						}
 						
 					});
 				} catch (UnsupportedEncodingException e) {
@@ -457,4 +470,26 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 		setState(STATE_IDLE);
 	}
 	
+	public static class ErrorFeedbackDialogFragment extends DialogFragment {
+		public static ErrorFeedbackDialogFragment newInstance(String title, String message) {
+			ErrorFeedbackDialogFragment f = new ErrorFeedbackDialogFragment();
+			Bundle args = new Bundle();
+			args.putString("message", message);
+			args.putString("title", title);
+			f.setArguments(args);
+			return f;
+		}
+		@Override
+		public Dialog onCreateDialog(Bundle savedInstanceState) {
+			AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+			builder.setMessage(getArguments().getString("message"))
+			.setTitle(getArguments().getString("title"))
+			.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+				public void onClick(DialogInterface dialog, int id) {
+					dialog.dismiss();
+				}
+			});
+			return builder.create();
+		}
+	}
 }

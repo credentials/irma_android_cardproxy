@@ -222,7 +222,8 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
     public void processIntent(Intent intent) {
         Tag tagFromIntent = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
     	IsoDep tag = IsoDep.get(tagFromIntent);
-    	if (tag != null) {
+    	// Only proces tag when we're actually expecting a card.
+    	if (tag != null && activityState == STATE_WAITING) {
     		lastTag = tag;
     		tryNextStep();
     	}    	

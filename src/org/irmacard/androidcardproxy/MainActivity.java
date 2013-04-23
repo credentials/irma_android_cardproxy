@@ -207,8 +207,6 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 	}
 	
 	public void onMainTouch(View v) {
-		// test code
-//		askForPIN();
 		if (activityState == STATE_IDLE) {
 			lastTag = null;
 			startQRScanner("Scan the QR image in the browser.");

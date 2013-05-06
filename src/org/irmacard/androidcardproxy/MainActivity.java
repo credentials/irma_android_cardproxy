@@ -3,15 +3,23 @@ package org.irmacard.androidcardproxy;
 import java.io.UnsupportedEncodingException;
 
 import net.sourceforge.scuba.smartcards.CardServiceException;
+import net.sourceforge.scuba.smartcards.CommandAPDU;
+import net.sourceforge.scuba.smartcards.ISO7816;
 import net.sourceforge.scuba.smartcards.IsoDepCardService;
 import net.sourceforge.scuba.smartcards.ProtocolCommand;
 import net.sourceforge.scuba.smartcards.ProtocolResponse;
 import net.sourceforge.scuba.smartcards.ProtocolResponses;
+import net.sourceforge.scuba.util.Hex;
 
 import org.apache.http.entity.StringEntity;
 import org.irmacard.android.util.pindialog.EnterPINDialogFragment;
 import org.irmacard.android.util.pindialog.EnterPINDialogFragment.PINDialogListener;
-import org.irmacard.androidcardproxy.ConfirmationDialogFragment.ConfirmationDialogListener;
+import org.irmacard.androidcardproxy.messages.EventArguments;
+import org.irmacard.androidcardproxy.messages.ReaderMessage;
+import org.irmacard.androidcardproxy.messages.ReaderMessageDeserializer;
+import org.irmacard.androidcardproxy.messages.ResponseArguments;
+import org.irmacard.androidcardproxy.messages.SelectAppletArguments;
+import org.irmacard.androidcardproxy.messages.TransmitCommandSetArguments;
 import org.irmacard.idemix.IdemixService;
 
 import android.app.Activity;
@@ -29,49 +37,35 @@ import android.nfc.tech.IsoDep;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.CountDownTimer;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 import android.view.Menu;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParser;
 import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
 import com.loopj.android.http.AsyncHttpClient;
 import com.loopj.android.http.AsyncHttpResponseHandler;
 
 
-public class MainActivity extends Activity implements PINDialogListener, ConfirmationDialogListener {
+public class MainActivity extends Activity implements PINDialogListener {
 	private String TAG = "CardProxyMainActivity";
 	private NfcAdapter nfcA;
 	private PendingIntent mPendingIntent;
 	private IntentFilter[] mFilters;
 	private String[][] mTechLists;
-	private boolean fromLink = false;
 
 	
 	
 	// State variables
 	private IsoDep lastTag = null;
-	private ProtocolStep lastCommandSet = null;
-	private boolean tagReadyForProcessing = false;
-	private boolean confirmationGiven = false;
-	private boolean pinSet = false;
-	private String pinCode = null;
-
-	private void resetState() {
-		confirmationGiven = false;
-		pinSet = false;
-		pinCode = null;
-		if (fromLink) {
-			fromLink = false;
-			// If the app was opened from a URL, go back (to the browser?) by closing this activity.
-			finish();
-		}
-	}
-	
 	
 	private int activityState = STATE_WAITING;
 	
@@ -85,15 +79,18 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 	
 	private CountDownTimer cdt = null;
 	
-	private static final int WAITTIME = 6000; // Time until the status jumps back to STATE_WAITING
+	private static final int WAITTIME = 6000; // Time until the status jumps back to STATE_IDLE
 	
 	private void setState(int state) {
+		setState(state, null);
+	}
+	
+	private void setState(int state, String feedback) {
+		// TODO: this might need some work now as well?
     	Log.i(TAG,"Set state: " + state);
     	activityState = state;
     	int imageResource = 0;
     	int statusTextResource = 0;
-    	boolean useResource = true;
-    	String statusTextString = "";
     	switch (activityState) {
     	case STATE_WAITING:
     		imageResource = R.drawable.irma_icon_place_card_520px;
@@ -102,10 +99,6 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 		case STATE_CHECKING:
 			imageResource = R.drawable.irma_icon_card_found_520px;
 			statusTextResource = R.string.status_checking;
-			if (lastCommandSet != null && lastCommandSet.feedbackMessage != null) {
-				useResource = false;
-				statusTextString = lastCommandSet.feedbackMessage;
-			}
 			break;
 		case STATE_RESULT_OK:
 			imageResource = R.drawable.irma_icon_ok_520px;
@@ -146,19 +139,22 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 
         	     public void onFinish() {
         	    	 if (activityState != STATE_CHECKING) {
+        	    		 // TODO: what is actually the proper state to return to?
         	    		 setState(STATE_IDLE);
         	    	 }
         	     }
         	  }.start();
     	}
     	
-    	if (useResource) {
+    	if (feedback == null) {
     		((TextView)findViewById(R.id.statustext)).setText(statusTextResource);
     	} else {
-    		((TextView)findViewById(R.id.statustext)).setText(statusTextString);
+    		((TextView)findViewById(R.id.statustext)).setText(feedback);
     	}
 		((ImageView)findViewById(R.id.statusimage)).setImageResource(imageResource);
 	}
+	
+
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -178,8 +174,8 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
         mTechLists = new String[][] { new String[] { IsoDep.class.getName() } };
 		
 	    setState(STATE_IDLE);
-
 	}
+
 
 	@Override
 	protected void onPause() {
@@ -188,6 +184,7 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
     		nfcA.disableForegroundDispatch(this);
     	}
 	}
+	
 	@Override
 	protected void onResume() {
         super.onResume();
@@ -195,12 +192,11 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
         if (NfcAdapter.ACTION_TECH_DISCOVERED.equals(getIntent().getAction())) {
             processIntent(getIntent());
         } else if (Intent.ACTION_VIEW.equals(getIntent().getAction()) && "cardproxy".equals(getIntent().getScheme())) {
-        	Log.i(TAG,"From link!");
+        	// TODO: this is legacy code to have the cardproxy app respond to cardproxy:// urls. This doesn't
+        	// work anymore, should check whether we want te re-enable it.
         	Uri uri = getIntent().getData();
-        	fromLink = true;
         	String startURL = "http://" + uri.getHost() + ":" + uri.getPort() + uri.getPath();
-        	Log.i(TAG, "Start URL: " + startURL);
-        	doInitialRequest(startURL);
+        	startChannelListening(startURL);
         }
         if (nfcA != null) {
         	nfcA.enableForegroundDispatch(this, mPendingIntent, mFilters, mTechLists);
@@ -210,6 +206,141 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 	@Override
 	protected void onDestroy() {
 		super.onDestroy();
+	}
+	private static final int MESSAGE_STARTGET = 1;
+	String currentReaderURL = "";
+	int currentHandlers = 0;
+	
+	Handler handler = new Handler() {
+		@Override
+		public void handleMessage(Message msg) {
+			switch (msg.what) {
+			case MESSAGE_STARTGET:
+				Log.i(TAG,"MESSAGE_STARTGET received in handler!");
+				AsyncHttpClient client = new AsyncHttpClient();
+				client.setTimeout(50000); // timeout of 50 seconds
+				client.setUserAgent("org.irmacard.androidcardproxy");
+				
+				client.get(MainActivity.this, currentReaderURL, new AsyncHttpResponseHandler() {
+					@Override
+					public void onSuccess(int arg0, String responseData) {
+						if (!responseData.equals("")) {
+							Toast.makeText(MainActivity.this, responseData, Toast.LENGTH_SHORT).show();
+							handleChannelData(responseData);
+						}
+						
+						// Do a new request, but only if no new requests have started
+						// in the mean time
+						if (currentHandlers <= 1) {
+							Message newMsg = new Message();
+							newMsg.what = MESSAGE_STARTGET;
+							handler.sendMessageDelayed(newMsg, 200);
+						}
+					}
+					@Override
+					public void onFailure(Throwable arg0, String arg1) {
+						Toast.makeText(MainActivity.this, "Unable to connect, retrying...", Toast.LENGTH_SHORT).show();
+						// TODO: retry only a certain number of times (3?) and then return to STATE_IDLE
+						// We should try again, but only if no new requests have started
+						// and we should wait a bit longer
+						if (currentHandlers <= 1) {
+							Message newMsg = new Message();
+							newMsg.what = MESSAGE_STARTGET;
+							handler.sendMessageDelayed(newMsg, 5000);
+						}
+						
+					}
+					public void onStart() {
+						currentHandlers += 1;
+					};
+					public void onFinish() {
+						currentHandlers -= 1;
+					};
+				});
+			
+				break;
+
+			default:
+				break;
+			}
+		}
+	};
+	
+	private boolean firstMessage = true;
+	private String currentWriteURL = null;
+	private ReaderMessage lastReaderMessage = null;
+	
+	private void handleChannelData(String data) {
+		Gson gson = new GsonBuilder().
+				registerTypeAdapter(ProtocolCommand.class, new ProtocolCommandDeserializer()).
+				registerTypeAdapter(ReaderMessage.class, new ReaderMessageDeserializer()).
+				create();
+		if (firstMessage) {
+			// this is the message that containts the url to write to
+			JsonParser p = new JsonParser();
+			String write_url = p.parse(data).getAsJsonObject().get("write_url").getAsString();
+			currentWriteURL = write_url;
+			setState(STATE_WAITING);			
+			firstMessage = false;
+			// Signal to the other end that we we are ready accept commands
+			postMessage(
+					new ReaderMessage(ReaderMessage.TYPE_EVENT, ReaderMessage.NAME_EVENT_CARDREADERFOUND, null,
+							new EventArguments().withEntry("type", "phone")));
+		} else {
+			ReaderMessage rm = gson.fromJson(data, ReaderMessage.class);
+			lastReaderMessage = rm;
+			if (rm.type.equals(ReaderMessage.TYPE_COMMAND)) {
+				setState(STATE_CHECKING);
+				if (rm.name.equals(ReaderMessage.NAME_COMMAND_AUTHPIN)) {
+					askForPIN();
+				} else {
+					new ProcessReaderMessage().execute(new ReaderInput(lastTag, rm));
+				}
+			} else if (rm.type.equals(ReaderMessage.TYPE_EVENT)) {
+				EventArguments ea = (EventArguments)rm.arguments;
+				if (rm.name.equals(ReaderMessage.NAME_EVENT_STATUSUPDATE)) {
+					String state = ea.data.get("state");
+					String feedback = ea.data.get("feedback");
+					if (state != null) {
+						if (state.equals("success")) {
+							setState(STATE_RESULT_OK, feedback);
+						} if (state.equals("warning")) {
+							setState(STATE_RESULT_WARNING, feedback);
+						} if (state.equals("failure")) {
+							setState(STATE_RESULT_MISSING, feedback);
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	
+	private void postMessage(ReaderMessage rm) {
+		if (currentWriteURL != null) {
+			Gson gson = new GsonBuilder().
+					registerTypeAdapter(ProtocolResponse.class, new ProtocolResponseSerializer()).
+					create();
+			String data = gson.toJson(rm);
+			AsyncHttpClient client = new AsyncHttpClient();
+			try {
+				client.post(MainActivity.this, currentWriteURL, new StringEntity(data) , "application/json",  new AsyncHttpResponseHandler() {
+					@Override
+					public void onSuccess(int arg0, String arg1) {
+						// TODO: Should there be some simple user feedback?
+						super.onSuccess(arg0, arg1);
+					}
+					@Override
+					public void onFailure(Throwable arg0, String arg1) {
+						// TODO: Give proper feedback to the user that we are unable to send stuff
+						super.onFailure(arg0, arg1);
+					}
+				});
+			} catch (UnsupportedEncodingException e) {
+				// Ignore, shouldn't happen ;)
+				e.printStackTrace();
+			}
+		}
 	}
 	
 	public void onMainTouch(View v) {
@@ -221,7 +352,6 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 	
     @Override
     public void onNewIntent(Intent intent) {
-        tagReadyForProcessing = true;
         setIntent(intent);
     }
     
@@ -230,8 +360,8 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
     	IsoDep tag = IsoDep.get(tagFromIntent);
     	// Only proces tag when we're actually expecting a card.
     	if (tag != null && activityState == STATE_WAITING) {
+    		postMessage(new ReaderMessage(ReaderMessage.TYPE_EVENT, ReaderMessage.NAME_EVENT_CARDFOUND, null));
     		lastTag = tag;
-    		tryNextStep();
     	}    	
     }
 	
@@ -245,64 +375,23 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
 		if (scanResult != null) {
 			String contents = scanResult.getContents();
 			if (contents != null) {
-				doInitialRequest(contents);
+				startChannelListening(contents);
 			}
 		}
 	}
 	
-	public void doInitialRequest(String startURL) {
+	private void startChannelListening(String url) {
+		Log.i(TAG, "Start channel listening: " + url);
+		currentReaderURL = url;
+		Message msg = new Message();
+		msg.what = MESSAGE_STARTGET;
 		setState(STATE_CONNECTING_TO_SERVER);
-		AsyncHttpClient client = new AsyncHttpClient();
-		try {
-			client.post(this, startURL, new StringEntity("") , "application/json",  new AsyncHttpResponseHandler() {
-			    @Override
-			    public void onSuccess(String response) {
-					Gson gson = new GsonBuilder().
-							setPrettyPrinting().
-							registerTypeAdapter(ProtocolCommand.class, new ProtocolCommandDeserializer()).
-							create();
-					lastCommandSet = gson.fromJson(response,ProtocolStep.class);
-					setState(STATE_WAITING);
-					tryNextStep();
-			    }
-			    @Override
-			    public void onFailure(Throwable arg0, String arg1) {
-			    	Log.e(TAG, "Failure: " + arg1 + "(" +arg0.getMessage() +  ")");
-					DialogFragment newFragment = ErrorFeedbackDialogFragment.newInstance("Connection Error", "There has been an error connecting to the Relying Party's webserver: " + arg0.getMessage());
-					newFragment.show(getFragmentManager(), "error");
-					setState(STATE_IDLE);
-					resetState();
-				}
-			});
-		} catch (UnsupportedEncodingException e) {
-			e.printStackTrace();
-		}
-
-	}
-
-	
-	public void tryNextStep() {
-		Log.i(TAG,"Try next step.");
-		if (lastCommandSet != null && lastCommandSet.askConfirmation && !confirmationGiven) {
-			askConfirmation(lastCommandSet.confirmationMessage);
-		} else if (lastCommandSet != null && lastCommandSet.usePIN && !pinSet) {
-			askForPIN();
-		} else if (activityState == STATE_WAITING && lastTag != null && tagReadyForProcessing) {
-			Log.i(TAG,"Trying to execute card commands.");
-			setState(STATE_CHECKING);
-			
-			new ProcessCommandSet().execute(new SmartcardProxyInput(lastCommandSet, lastTag, pinCode));
-		}
+		handler.sendMessage(msg);
 	}
 	
 	public void askForPIN() {
 		DialogFragment newFragment = new EnterPINDialogFragment();
 	    newFragment.show(getFragmentManager(), "pinentry");
-	}
-	
-	public void askConfirmation(String message) {
-		DialogFragment newFragment = ConfirmationDialogFragment.newInstance(message);
-		newFragment.show(getFragmentManager(), "confirmation");
 	}
 	
 	@Override
@@ -317,161 +406,121 @@ public class MainActivity extends Activity implements PINDialogListener, Confirm
     	integrator.initiateScan(IntentIntegrator.QR_CODE_TYPES, message);
 	}
 	
-	private class SmartcardProxyInput {
-		public ProtocolStep cs;
+	
+	private class ReaderInput {
 		public IsoDep tag;
-		public String pincode;
-		SmartcardProxyInput(ProtocolStep cs, IsoDep tag, String pincode) {
-			this.cs = cs;
+		public ReaderMessage message;
+		public String pincode = null;
+		public ReaderInput(IsoDep tag, ReaderMessage message) {
 			this.tag = tag;
+			this.message = message;
+		}
+		
+		public ReaderInput(IsoDep tag, ReaderMessage message, String pincode) {
+			this.tag = tag;
+			this.message = message;
 			this.pincode = pincode;
 		}
 	}
-	
-	private class SmartcardProxyOutput {
-		public ProtocolStep cs;
-		public ProtocolResponses responses;
-		Exception errorException = null;
-	}
-	
-	public static byte[] string2bytepin(String pincode) {
-		byte[] result = new byte[pincode.length()];
-		for (int i = 0; i < pincode.length(); i++) {
-			result[i] = (byte)(pincode.charAt(i));
-		}
-		return result;
-	}
-	
-	private class ProcessCommandSet extends AsyncTask<SmartcardProxyInput, Void, SmartcardProxyOutput> {
+
+    /**
+     * INStruction to select an application.
+     */
+    private static final byte INS_SELECT_APPLICATION = (byte) 0xA4;
+
+    /**
+     * P1 parameter for select by name.
+     */
+    private static final byte P1_SELECT_BY_NAME = 0x04;
+    
+	private class ProcessReaderMessage extends AsyncTask<ReaderInput, Void, ReaderMessage> {
+		
 
 		@Override
-		protected SmartcardProxyOutput doInBackground(SmartcardProxyInput... params) {
-			IsoDep tag = params[0].tag;
-			ProtocolStep cs = params[0].cs;
-			String pincode = params[0].pincode;
-			
+		protected ReaderMessage doInBackground(ReaderInput... params) {
+			ReaderInput input = params[0];
+			IsoDep tag = input.tag;
+			ReaderMessage rm = input.message;
 			// Make sure time-out is long enough (10 seconds)
 			tag.setTimeout(10000);
 			
+			// TODO: The current version of the cardproxy shouldn't depend on idemix terminal, but for now
+			// it is convenient.
 			IdemixService is = new IdemixService(new IsoDepCardService(tag));
-			
-			SmartcardProxyOutput smartcardOutput = new SmartcardProxyOutput();
-			smartcardOutput.cs = cs;
-			smartcardOutput.responses = new ProtocolResponses();
 			try {
 				if (!is.isOpen()) {
+					// TODO: this is dangerous, this call to IdemixService already does a "select applet"
 					is.open();
 				}
-				if (pincode != null) {
-					is.sendPin(string2bytepin(pincode));
+				if (rm.name.equals("selectApplet")) {
+					SelectAppletArguments a = (SelectAppletArguments) rm.arguments;
+					byte[] aidBytes = Hex.hexStringToBytes(a.AID);
+				    ProtocolCommand selectApplicationCommand =
+				    		new ProtocolCommand(
+				    				"selectapplet",
+				    				"Select IRMAcard application",
+				    				 new CommandAPDU(ISO7816.CLA_ISO7816,
+				    			                INS_SELECT_APPLICATION, P1_SELECT_BY_NAME, 0x00, aidBytes, 256)); // LE == 0 is required.
+				    
+				    // All this stuff is mostly the same as for transmitCommandSet. Why do we actually have a separate 
+				    // "selectApplet" command? Can't it just be put in a separate call to transmitCommandSet?				    
+				    ProtocolResponses responses = new ProtocolResponses();
+				    responses.put(selectApplicationCommand.getKey(), 
+				    		new ProtocolResponse(selectApplicationCommand.getKey(),
+				    				is.transmit(selectApplicationCommand.getAPDU())));
+					return new ReaderMessage(ReaderMessage.TYPE_RESPONSE, rm.name, rm.id,new ResponseArguments(responses));
+				} else if (rm.name.equals(ReaderMessage.NAME_COMMAND_AUTHPIN)) {
+					if (input.pincode != null) {
+						// TODO: this should be done properly, maybe without using IdemixService?
+						is.sendPin(input.pincode.getBytes());
+						// TODO: the following statement needs to be redone, currently always returns success
+						// How can we actually determine success?
+						return new ReaderMessage("response", rm.name, rm.id, new ResponseArguments("success"));
+					}
+				} else if (rm.name.equals(ReaderMessage.NAME_COMMAND_TRANSMIT)) {
+					TransmitCommandSetArguments arg = (TransmitCommandSetArguments)rm.arguments;
+					ProtocolResponses responses = new ProtocolResponses();
+					for (ProtocolCommand c: arg.transmitCommands) {
+						responses.put(c.getKey(), 
+								new ProtocolResponse(c.getKey(), is.transmit(c.getAPDU())));
+					}
+					return new ReaderMessage(ReaderMessage.TYPE_RESPONSE, rm.name, rm.id,new ResponseArguments(responses));
 				}
 				
-				for (ProtocolCommand c : cs.commands) {
-					smartcardOutput.responses.put(c.getKey(), 
-							new ProtocolResponse(c.getKey(), is.transmit(c.getAPDU())));
-				}
-//				is.close(); 
 			} catch (CardServiceException e) {
-				smartcardOutput.errorException = e;
 				e.printStackTrace();
+				// TODO: maybe also include the information about the exception in the event?
+				return new ReaderMessage(ReaderMessage.TYPE_EVENT, ReaderMessage.NAME_EVENT_CARDLOST, null);
 			}
-			
-			return smartcardOutput;
+			return null;
 		}
-		
-
 		
 		@Override
-		protected void onPostExecute(SmartcardProxyOutput result) {
-			// This is executed in the main UI thread
-			Gson gson = new GsonBuilder().
-					setPrettyPrinting().
-					registerTypeAdapter(ProtocolResponse.class, new ProtocolResponseSerializer()).
-					create();
-			if (result.errorException != null) {
-				setState(STATE_RESULT_WARNING);
-				resetState();
-				tagReadyForProcessing = false;
-			} else {
-				String httpresult = gson.toJson(result.responses);
-				Log.i(TAG,"Sending card responses to " + result.cs.responseurl);
-				AsyncHttpClient client = new AsyncHttpClient();
-				try {
-					client.post(MainActivity.this, result.cs.responseurl, new StringEntity(httpresult) , "application/json",  new AsyncHttpResponseHandler() {
-						@Override
-						public void onSuccess(String response) {
-							Log.i(TAG,response);
-							Gson gson = new GsonBuilder().
-									setPrettyPrinting().
-									registerTypeAdapter(ProtocolCommand.class, new ProtocolCommandDeserializer()).
-									create();
-							lastCommandSet = gson.fromJson(response,ProtocolStep.class);
-							if (lastCommandSet.protocolDone) {
-								tagReadyForProcessing = false;
-								if (lastCommandSet.status != null) {
-									if (lastCommandSet.status.equals("success")) {
-										setState(STATE_RESULT_OK);
-									} else {
-										setState(STATE_RESULT_MISSING);
-									}
-								} else {
-									setState(STATE_RESULT_MISSING);
-								}
-								if (lastCommandSet.feedbackMessage != null) {
-									((TextView)findViewById(R.id.statustext)).setText(lastCommandSet.feedbackMessage);
-								}
-								resetState();
-							} else {
-								setState(STATE_WAITING);
-								if (lastCommandSet.feedbackMessage != null) {
-									((TextView)findViewById(R.id.statustext)).setText(lastCommandSet.feedbackMessage);
-								}
-								tryNextStep();
-							}
-							
-						}
-						@Override
-						public void onFailure(Throwable arg0, String arg1) {
-							DialogFragment newFragment = ErrorFeedbackDialogFragment.newInstance("Connection Error", "There has been an error connecting to the Relying Party's webserver: " + arg0.getMessage());
-							newFragment.show(getFragmentManager(), "error");
-							setState(STATE_IDLE);
-							resetState();
-						}
-						
-					});
-				} catch (UnsupportedEncodingException e) {
-					e.printStackTrace();
-				}
+		protected void onPostExecute(ReaderMessage result) {
+			if (result != null) {
+				// TODO: what we could consider here is checking whether any of the responses indicate
+				// that a pincode entry is required, ask for the pincode and retry the ReaderMessage?
+				postMessage(result);
 			}
 		}
-	}
-
-
+	}	
 
 	@Override
 	public void onPINEntry(String dialogPincode) {
+		// TODO: in the final version, the following debug code should go :)
 		Log.i(TAG, "PIN entered: " + dialogPincode);
-		pinSet = true;
-		pinCode = dialogPincode;
-		tryNextStep();
+		new ProcessReaderMessage().execute(new ReaderInput(lastTag, lastReaderMessage, dialogPincode));
 	}
 
 	@Override
 	public void onPINCancel() {
 		Log.i(TAG, "PIN entry canceled!");
-		setState(STATE_IDLE);
-		resetState();
-	}
-
-	@Override
-	public void onConfirmationPositive() {
-		confirmationGiven = true;
-		tryNextStep();
-	}
-
-	@Override
-	public void onConfirmationNegative() {
-		resetState();
+		postMessage(
+				new ReaderMessage(ReaderMessage.TYPE_RESPONSE, 
+						ReaderMessage.NAME_COMMAND_AUTHPIN, 
+						lastReaderMessage.id, 
+						new ResponseArguments("cancel")));
+		
 		setState(STATE_IDLE);
 	}
 	

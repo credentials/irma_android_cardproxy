@@ -16,7 +16,7 @@ public class ReaderMessageDeserializer implements JsonDeserializer<ReaderMessage
 		ReaderMessage rm = new ReaderMessage(
 				json.getAsJsonObject().get("type").getAsString(), 
 				json.getAsJsonObject().get("name").getAsString(), 
-				json.getAsJsonObject().get("type").getAsString());
+				json.getAsJsonObject().get("id").getAsString());
 		if (rm.type.equals("event")) {
 			rm.arguments = context.deserialize(json.getAsJsonObject().get("arguments"), EventArguments.class);
 		} else if (rm.type.equals("command")) {

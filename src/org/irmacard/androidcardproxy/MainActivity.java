@@ -1,5 +1,6 @@
 package org.irmacard.androidcardproxy;
 
+import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
 
 import net.sourceforge.scuba.smartcards.CardServiceException;
@@ -49,6 +50,7 @@ import android.widget.Toast;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParser;
+import com.google.gson.stream.JsonReader;
 import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
 import com.loopj.android.http.AsyncHttpClient;
@@ -287,9 +289,19 @@ public class MainActivity extends Activity implements PINDialogListener {
 					new ReaderMessage(ReaderMessage.TYPE_EVENT, ReaderMessage.NAME_EVENT_CARDREADERFOUND, null,
 							new EventArguments().withEntry("type", "phone")));
 		} else {
-			ReaderMessage rm = gson.fromJson(data, ReaderMessage.class);
+			ReaderMessage rm;
+			try {
+				Log.i(TAG, "Length (real): " + data);
+				JsonReader reader = new JsonReader(new StringReader(data));
+				reader.setLenient(true);
+				rm = gson.fromJson(reader, ReaderMessage.class);
+			} catch(Exception e) {
+				e.printStackTrace();
+				return;
+			}
 			lastReaderMessage = rm;
 			if (rm.type.equals(ReaderMessage.TYPE_COMMAND)) {
+				Log.i(TAG, "Got command message");
 				setState(STATE_CHECKING);
 				if (rm.name.equals(ReaderMessage.NAME_COMMAND_AUTHPIN)) {
 					askForPIN();
@@ -480,11 +492,11 @@ public class MainActivity extends Activity implements PINDialogListener {
 				} else if (rm.name.equals(ReaderMessage.NAME_COMMAND_TRANSMIT)) {
 					TransmitCommandSetArguments arg = (TransmitCommandSetArguments)rm.arguments;
 					ProtocolResponses responses = new ProtocolResponses();
-					for (ProtocolCommand c: arg.transmitCommands) {
+					for (ProtocolCommand c: arg.commands) {
 						responses.put(c.getKey(), 
 								new ProtocolResponse(c.getKey(), is.transmit(c.getAPDU())));
 					}
-					return new ReaderMessage(ReaderMessage.TYPE_RESPONSE, rm.name, rm.id,new ResponseArguments(responses));
+					return new ReaderMessage(ReaderMessage.TYPE_RESPONSE, rm.name, rm.id, new ResponseArguments(responses));
 				}
 				
 			} catch (CardServiceException e) {

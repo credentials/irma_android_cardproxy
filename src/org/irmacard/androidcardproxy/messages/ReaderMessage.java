@@ -18,9 +18,7 @@ public class ReaderMessage {
 	public static String NAME_EVENT_CARDLOST = "cardRemoved";
 	public static String NAME_EVENT_CARDREADERFOUND = "cardReaderFound";
 	public static String NAME_EVENT_STATUSUPDATE = "statusUpdate";
-	
 
-	
 	public ReaderMessage(String type, String name) {
 		this.type = type;
 		this.name = name;
@@ -37,5 +35,9 @@ public class ReaderMessage {
 		this.name = name;
 		this.id = id;
 		this.arguments = arguments;		
+	}
+
+	public String toString() {
+		return "<Type: " + type + ", name: " + name + ", id: " + id + ", arguments: " + arguments.toString() + ">";
 	}
 }

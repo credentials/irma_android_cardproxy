@@ -134,9 +134,7 @@ public class MainActivity extends Activity implements PINDialogListener {
         		cdt.cancel();
         	}
         	cdt = new CountDownTimer(WAITTIME, 100) {
-
         	     public void onTick(long millisUntilFinished) {
-
         	     }
 
         	     public void onFinish() {
@@ -145,7 +143,7 @@ public class MainActivity extends Activity implements PINDialogListener {
         	    		 setState(STATE_IDLE);
         	    	 }
         	     }
-        	  }.start();
+        	}.start();
     	}
     	
     	if (feedback == null) {
@@ -174,7 +172,7 @@ public class MainActivity extends Activity implements PINDialogListener {
 
         // Setup a tech list for all IsoDep cards
         mTechLists = new String[][] { new String[] { IsoDep.class.getName() } };
-		
+
 	    setState(STATE_IDLE);
 	}
 

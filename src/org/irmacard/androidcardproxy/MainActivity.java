@@ -464,24 +464,7 @@ public class MainActivity extends Activity implements PINDialogListener {
 					// TODO: this is dangerous, this call to IdemixService already does a "select applet"
 					is.open();
 				}
-				if (rm.name.equals("selectApplet")) {
-					SelectAppletArguments a = (SelectAppletArguments) rm.arguments;
-					byte[] aidBytes = Hex.hexStringToBytes(a.AID);
-				    ProtocolCommand selectApplicationCommand =
-				    		new ProtocolCommand(
-				    				"selectapplet",
-				    				"Select IRMAcard application",
-				    				 new CommandAPDU(ISO7816.CLA_ISO7816,
-				    			                INS_SELECT_APPLICATION, P1_SELECT_BY_NAME, 0x00, aidBytes, 256)); // LE == 0 is required.
-				    
-				    // All this stuff is mostly the same as for transmitCommandSet. Why do we actually have a separate 
-				    // "selectApplet" command? Can't it just be put in a separate call to transmitCommandSet?				    
-				    ProtocolResponses responses = new ProtocolResponses();
-				    responses.put(selectApplicationCommand.getKey(), 
-				    		new ProtocolResponse(selectApplicationCommand.getKey(),
-				    				is.transmit(selectApplicationCommand.getAPDU())));
-					return new ReaderMessage(ReaderMessage.TYPE_RESPONSE, rm.name, rm.id,new ResponseArguments(responses));
-				} else if (rm.name.equals(ReaderMessage.NAME_COMMAND_AUTHPIN)) {
+				if (rm.name.equals(ReaderMessage.NAME_COMMAND_AUTHPIN)) {
 					if (input.pincode != null) {
 						// TODO: this should be done properly, maybe without using IdemixService?
 						tries = is.sendCredentialPin(input.pincode.getBytes());

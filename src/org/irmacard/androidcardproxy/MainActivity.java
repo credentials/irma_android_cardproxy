@@ -16,6 +16,7 @@ import org.apache.http.entity.StringEntity;
 import org.irmacard.android.util.pindialog.EnterPINDialogFragment;
 import org.irmacard.android.util.pindialog.EnterPINDialogFragment.PINDialogListener;
 import org.irmacard.androidcardproxy.messages.EventArguments;
+import org.irmacard.androidcardproxy.messages.PinResultArguments;
 import org.irmacard.androidcardproxy.messages.ReaderMessage;
 import org.irmacard.androidcardproxy.messages.ReaderMessageDeserializer;
 import org.irmacard.androidcardproxy.messages.ResponseArguments;
@@ -64,7 +65,8 @@ public class MainActivity extends Activity implements PINDialogListener {
 	private IntentFilter[] mFilters;
 	private String[][] mTechLists;
 
-	
+	// PIN handling
+	private int tries = -1;
 	
 	// State variables
 	private IsoDep lastTag = null;
@@ -400,7 +402,7 @@ public class MainActivity extends Activity implements PINDialogListener {
 	}
 	
 	public void askForPIN() {
-		DialogFragment newFragment = new EnterPINDialogFragment();
+		DialogFragment newFragment = EnterPINDialogFragment.getInstance(tries);
 	    newFragment.show(getFragmentManager(), "pinentry");
 	}
 	
@@ -482,10 +484,9 @@ public class MainActivity extends Activity implements PINDialogListener {
 				} else if (rm.name.equals(ReaderMessage.NAME_COMMAND_AUTHPIN)) {
 					if (input.pincode != null) {
 						// TODO: this should be done properly, maybe without using IdemixService?
-						is.sendPin(input.pincode.getBytes());
-						// TODO: the following statement needs to be redone, currently always returns success
-						// How can we actually determine success?
-						return new ReaderMessage("response", rm.name, rm.id, new ResponseArguments("success"));
+						tries = is.sendCredentialPin(input.pincode.getBytes());
+
+						return new ReaderMessage("response", rm.name, rm.id, new PinResultArguments(tries));
 					}
 				} else if (rm.name.equals(ReaderMessage.NAME_COMMAND_TRANSMIT)) {
 					TransmitCommandSetArguments arg = (TransmitCommandSetArguments)rm.arguments;
@@ -508,8 +509,20 @@ public class MainActivity extends Activity implements PINDialogListener {
 		@Override
 		protected void onPostExecute(ReaderMessage result) {
 			if (result != null) {
-				// TODO: what we could consider here is checking whether any of the responses indicate
-				// that a pincode entry is required, ask for the pincode and retry the ReaderMessage?
+				if(result.name.equals(ReaderMessage.NAME_COMMAND_AUTHPIN)) {
+					// Handle pin seperately, abort if pin incorrect and more tries left
+					PinResultArguments args = (PinResultArguments) result.arguments;
+					if(!args.success) {
+						if(args.tries > 0) {
+							// Still some tries left, asking again
+							askForPIN();
+							return; // do not send a response yet.
+						} else {
+							// FIXME: No more tries left
+							// Need to go to error state
+						}
+					}
+				}
 				postMessage(result);
 			}
 		}

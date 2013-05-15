@@ -14,8 +14,8 @@ public class ReaderMessage {
 	public static String NAME_COMMAND_TRANSMIT = "transmitCommandSet";
 	public static String NAME_COMMAND_SELECTAPPLET = "selectApplet";
 
-	public static String NAME_EVENT_CARDFOUND = "cardFound";
-	public static String NAME_EVENT_CARDLOST = "cardLost";
+	public static String NAME_EVENT_CARDFOUND = "cardInserted";
+	public static String NAME_EVENT_CARDLOST = "cardRemoved";
 	public static String NAME_EVENT_CARDREADERFOUND = "cardReaderFound";
 	public static String NAME_EVENT_STATUSUPDATE = "statusUpdate";
 	

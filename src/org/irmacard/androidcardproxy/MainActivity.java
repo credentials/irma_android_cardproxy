@@ -10,6 +10,7 @@ import net.sourceforge.scuba.smartcards.IsoDepCardService;
 import net.sourceforge.scuba.smartcards.ProtocolCommand;
 import net.sourceforge.scuba.smartcards.ProtocolResponse;
 import net.sourceforge.scuba.smartcards.ProtocolResponses;
+import net.sourceforge.scuba.smartcards.ResponseAPDU;
 import net.sourceforge.scuba.util.Hex;
 
 import org.apache.http.entity.StringEntity;
@@ -475,8 +476,12 @@ public class MainActivity extends Activity implements PINDialogListener {
 					TransmitCommandSetArguments arg = (TransmitCommandSetArguments)rm.arguments;
 					ProtocolResponses responses = new ProtocolResponses();
 					for (ProtocolCommand c: arg.commands) {
+						ResponseAPDU apdu_response = is.transmit(c.getAPDU());
 						responses.put(c.getKey(), 
-								new ProtocolResponse(c.getKey(), is.transmit(c.getAPDU())));
+								new ProtocolResponse(c.getKey(), apdu_response));
+						if(apdu_response.getSW() != 0x9000) {
+							break;
+						}
 					}
 					return new ReaderMessage(ReaderMessage.TYPE_RESPONSE, rm.name, rm.id, new ResponseArguments(responses));
 				}

@@ -4,15 +4,11 @@ import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
 
 import net.sourceforge.scuba.smartcards.CardServiceException;
-import net.sourceforge.scuba.smartcards.CommandAPDU;
-import net.sourceforge.scuba.smartcards.ISO7816;
 import net.sourceforge.scuba.smartcards.IsoDepCardService;
 import net.sourceforge.scuba.smartcards.ProtocolCommand;
 import net.sourceforge.scuba.smartcards.ProtocolResponse;
 import net.sourceforge.scuba.smartcards.ProtocolResponses;
 import net.sourceforge.scuba.smartcards.ResponseAPDU;
-import net.sourceforge.scuba.util.Hex;
-
 import org.apache.http.entity.StringEntity;
 import org.irmacard.android.util.pindialog.EnterPINDialogFragment;
 import org.irmacard.android.util.pindialog.EnterPINDialogFragment.PINDialogListener;
@@ -21,7 +17,6 @@ import org.irmacard.androidcardproxy.messages.PinResultArguments;
 import org.irmacard.androidcardproxy.messages.ReaderMessage;
 import org.irmacard.androidcardproxy.messages.ReaderMessageDeserializer;
 import org.irmacard.androidcardproxy.messages.ResponseArguments;
-import org.irmacard.androidcardproxy.messages.SelectAppletArguments;
 import org.irmacard.androidcardproxy.messages.TransmitCommandSetArguments;
 import org.irmacard.idemix.IdemixService;
 
@@ -435,16 +430,6 @@ public class MainActivity extends Activity implements PINDialogListener {
 			this.pincode = pincode;
 		}
 	}
-
-    /**
-     * INStruction to select an application.
-     */
-    private static final byte INS_SELECT_APPLICATION = (byte) 0xA4;
-
-    /**
-     * P1 parameter for select by name.
-     */
-    private static final byte P1_SELECT_BY_NAME = 0x04;
     
 	private class ProcessReaderMessage extends AsyncTask<ReaderInput, Void, ReaderMessage> {
 		

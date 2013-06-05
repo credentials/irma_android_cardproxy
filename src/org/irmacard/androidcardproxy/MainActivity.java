@@ -34,7 +34,6 @@ import android.nfc.Tag;
 import android.nfc.tech.IsoDep;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
@@ -67,19 +66,15 @@ public class MainActivity extends Activity implements PINDialogListener {
 	// State variables
 	private IsoDep lastTag = null;
 	
-	private int activityState = STATE_WAITING;
+	private int activityState = STATE_IDLE;
 	
-	private static final int STATE_WAITING = 0;
-	private static final int STATE_CHECKING = 1;
-	private static final int STATE_RESULT_OK = 2;
-	private static final int STATE_RESULT_MISSING = 3;
-	private static final int STATE_RESULT_WARNING = 4;
-	private static final int STATE_CONNECTING_TO_SERVER = 5;
+	// New states
 	private static final int STATE_IDLE = 10;
-	
-	private CountDownTimer cdt = null;
-	
-	private static final int WAITTIME = 6000; // Time until the status jumps back to STATE_IDLE
+	private static final int STATE_CONNECTING_TO_SERVER = 5;
+	private static final int STATE_CONNECTED = 11;
+	private static final int STATE_READY = 12;
+	private static final int STATE_COMMUNICATING = 13;
+	private static final int STATE_WAITING_FOR_PIN = 14;
 	
 	private void setState(int state) {
 		setState(state, null);
@@ -92,26 +87,6 @@ public class MainActivity extends Activity implements PINDialogListener {
     	int imageResource = 0;
     	int statusTextResource = 0;
     	switch (activityState) {
-    	case STATE_WAITING:
-    		imageResource = R.drawable.irma_icon_place_card_520px;
-    		statusTextResource = R.string.status_waiting;    		
-    		break;
-		case STATE_CHECKING:
-			imageResource = R.drawable.irma_icon_card_found_520px;
-			statusTextResource = R.string.status_checking;
-			break;
-		case STATE_RESULT_OK:
-			imageResource = R.drawable.irma_icon_ok_520px;
-			statusTextResource = R.string.status_ok;
-			break;
-		case STATE_RESULT_MISSING:
-			imageResource = R.drawable.irma_icon_missing_520px;
-			statusTextResource = R.string.status_missing;
-			break;
-		case STATE_RESULT_WARNING:
-			imageResource = R.drawable.irma_icon_warning_520px;
-			statusTextResource = R.string.status_warning;
-			break;
 		case STATE_IDLE:
 			imageResource = R.drawable.irma_icon_place_card_520px;
 			statusTextResource = R.string.status_idle;
@@ -121,34 +96,46 @@ public class MainActivity extends Activity implements PINDialogListener {
 			imageResource = R.drawable.irma_icon_place_card_520px;
 			statusTextResource = R.string.connectserver;
 			break;
+		case STATE_CONNECTED:
+			imageResource = R.drawable.irma_icon_place_card_520px;
+			statusTextResource = R.string.status_waiting;
+			break;
+		case STATE_READY:
+			imageResource = R.drawable.irma_icon_card_found_520px;
+			statusTextResource = R.string.status_ready;
+			break;
+		case STATE_COMMUNICATING:
+			imageResource = R.drawable.irma_icon_card_found_520px;
+			statusTextResource = R.string.status_communicating;
+			break;
+		case STATE_WAITING_FOR_PIN:
+			imageResource = R.drawable.irma_icon_card_found_520px;
+			statusTextResource = R.string.status_waitingforpin;
+			break;
 		default:
 			break;
 		}
-    	
-    	if (activityState == STATE_RESULT_OK ||
-    			activityState == STATE_RESULT_MISSING || 
-    			activityState == STATE_RESULT_WARNING) {
-        	if (cdt != null) {
-        		cdt.cancel();
-        	}
-        	cdt = new CountDownTimer(WAITTIME, 100) {
-        	     public void onTick(long millisUntilFinished) {
-        	     }
-
-        	     public void onFinish() {
-        	    	 if (activityState != STATE_CHECKING) {
-        	    		 // TODO: what is actually the proper state to return to?
-        	    		 setState(STATE_IDLE);
-        	    	 }
-        	     }
-        	}.start();
-    	}
     	
     	if (feedback == null) {
     		((TextView)findViewById(R.id.statustext)).setText(statusTextResource);
     	} else {
     		((TextView)findViewById(R.id.statustext)).setText(feedback);
     	}
+		((ImageView)findViewById(R.id.statusimage)).setImageResource(imageResource);
+	}
+	
+	private void setFeedback(String message, String state) {
+    	int imageResource = 0;
+
+		if (state.equals("success")) {
+			imageResource = R.drawable.irma_icon_ok_520px;
+		} if (state.equals("warning")) {
+			imageResource = R.drawable.irma_icon_missing_520px;
+		} if (state.equals("failure")) {
+			imageResource = R.drawable.irma_icon_warning_520px;
+		}
+
+    	((TextView)findViewById(R.id.statustext)).setText(message);
 		((ImageView)findViewById(R.id.statusimage)).setImageResource(imageResource);
 	}
 	
@@ -194,7 +181,7 @@ public class MainActivity extends Activity implements PINDialogListener {
         	// work anymore, should check whether we want te re-enable it.
         	Uri uri = getIntent().getData();
         	String startURL = "http://" + uri.getHost() + ":" + uri.getPort() + uri.getPath();
-        	startChannelListening(startURL);
+        	gotoConnectingState(startURL);
         }
         if (nfcA != null) {
         	nfcA.enableForegroundDispatch(this, mPendingIntent, mFilters, mTechLists);
@@ -263,8 +250,7 @@ public class MainActivity extends Activity implements PINDialogListener {
 			}
 		}
 	};
-	
-	private boolean firstMessage = true;
+
 	private String currentWriteURL = null;
 	private ReaderMessage lastReaderMessage = null;
 	
@@ -273,13 +259,12 @@ public class MainActivity extends Activity implements PINDialogListener {
 				registerTypeAdapter(ProtocolCommand.class, new ProtocolCommandDeserializer()).
 				registerTypeAdapter(ReaderMessage.class, new ReaderMessageDeserializer()).
 				create();
-		if (firstMessage) {
+		if (activityState == STATE_CONNECTING_TO_SERVER) {
 			// this is the message that containts the url to write to
 			JsonParser p = new JsonParser();
 			String write_url = p.parse(data).getAsJsonObject().get("write_url").getAsString();
 			currentWriteURL = write_url;
-			setState(STATE_WAITING);			
-			firstMessage = false;
+			setState(STATE_CONNECTED);
 			// Signal to the other end that we we are ready accept commands
 			postMessage(
 					new ReaderMessage(ReaderMessage.TYPE_EVENT, ReaderMessage.NAME_EVENT_CARDREADERFOUND, null,
@@ -298,10 +283,17 @@ public class MainActivity extends Activity implements PINDialogListener {
 			lastReaderMessage = rm;
 			if (rm.type.equals(ReaderMessage.TYPE_COMMAND)) {
 				Log.i(TAG, "Got command message");
-				setState(STATE_CHECKING);
+
+				if (activityState != STATE_READY) {
+					// Only when ready can we handle commands
+					throw new RuntimeException(
+							"Illegal command from server, no card currently connected");
+				}
+
 				if (rm.name.equals(ReaderMessage.NAME_COMMAND_AUTHPIN)) {
 					askForPIN();
 				} else {
+					setState(STATE_COMMUNICATING);
 					new ProcessReaderMessage().execute(new ReaderInput(lastTag, rm));
 				}
 			} else if (rm.type.equals(ReaderMessage.TYPE_EVENT)) {
@@ -310,13 +302,7 @@ public class MainActivity extends Activity implements PINDialogListener {
 					String state = ea.data.get("state");
 					String feedback = ea.data.get("feedback");
 					if (state != null) {
-						if (state.equals("success")) {
-							setState(STATE_RESULT_OK, feedback);
-						} if (state.equals("warning")) {
-							setState(STATE_RESULT_WARNING, feedback);
-						} if (state.equals("failure")) {
-							setState(STATE_RESULT_MISSING, feedback);
-						}
+						setFeedback(feedback, state);
 					}
 				}
 			}
@@ -367,7 +353,8 @@ public class MainActivity extends Activity implements PINDialogListener {
         Tag tagFromIntent = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
     	IsoDep tag = IsoDep.get(tagFromIntent);
     	// Only proces tag when we're actually expecting a card.
-    	if (tag != null && activityState == STATE_WAITING) {
+    	if (tag != null && activityState == STATE_CONNECTED) {
+    		setState(STATE_READY);
     		postMessage(new ReaderMessage(ReaderMessage.TYPE_EVENT, ReaderMessage.NAME_EVENT_CARDFOUND, null));
     		lastTag = tag;
     	}    	
@@ -383,12 +370,12 @@ public class MainActivity extends Activity implements PINDialogListener {
 		if (scanResult != null) {
 			String contents = scanResult.getContents();
 			if (contents != null) {
-				startChannelListening(contents);
+				gotoConnectingState(contents);
 			}
 		}
 	}
 	
-	private void startChannelListening(String url) {
+	private void gotoConnectingState(String url) {
 		Log.i(TAG, "Start channel listening: " + url);
 		currentReaderURL = url;
 		Message msg = new Message();
@@ -398,6 +385,7 @@ public class MainActivity extends Activity implements PINDialogListener {
 	}
 	
 	public void askForPIN() {
+		setState(STATE_WAITING_FOR_PIN);
 		DialogFragment newFragment = EnterPINDialogFragment.getInstance(tries);
 	    newFragment.show(getFragmentManager(), "pinentry");
 	}
@@ -481,6 +469,10 @@ public class MainActivity extends Activity implements PINDialogListener {
 		
 		@Override
 		protected void onPostExecute(ReaderMessage result) {
+			if(activityState == STATE_COMMUNICATING) {
+				setState(STATE_READY);
+			}
+
 			if (result != null) {
 				if(result.name.equals(ReaderMessage.NAME_COMMAND_AUTHPIN)) {
 					// Handle pin seperately, abort if pin incorrect and more tries left
@@ -488,6 +480,7 @@ public class MainActivity extends Activity implements PINDialogListener {
 					if(!args.success) {
 						if(args.tries > 0) {
 							// Still some tries left, asking again
+							setState(STATE_WAITING_FOR_PIN);
 							askForPIN();
 							return; // do not send a response yet.
 						} else {
@@ -505,6 +498,7 @@ public class MainActivity extends Activity implements PINDialogListener {
 	public void onPINEntry(String dialogPincode) {
 		// TODO: in the final version, the following debug code should go :)
 		Log.i(TAG, "PIN entered: " + dialogPincode);
+		setState(STATE_COMMUNICATING);
 		new ProcessReaderMessage().execute(new ReaderInput(lastTag, lastReaderMessage, dialogPincode));
 	}
 
@@ -517,7 +511,7 @@ public class MainActivity extends Activity implements PINDialogListener {
 						lastReaderMessage.id, 
 						new ResponseArguments("cancel")));
 		
-		setState(STATE_IDLE);
+		setState(STATE_READY);
 	}
 	
 	public static class ErrorFeedbackDialogFragment extends DialogFragment {

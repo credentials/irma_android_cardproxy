@@ -2,6 +2,8 @@ package org.irmacard.androidcardproxy;
 
 import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import net.sourceforge.scuba.smartcards.CardServiceException;
 import net.sourceforge.scuba.smartcards.IsoDepCardService;
@@ -69,12 +71,16 @@ public class MainActivity extends Activity implements PINDialogListener {
 	private int activityState = STATE_IDLE;
 	
 	// New states
-	private static final int STATE_IDLE = 10;
-	private static final int STATE_CONNECTING_TO_SERVER = 5;
-	private static final int STATE_CONNECTED = 11;
-	private static final int STATE_READY = 12;
-	private static final int STATE_COMMUNICATING = 13;
-	private static final int STATE_WAITING_FOR_PIN = 14;
+	private static final int STATE_IDLE = 1;
+	private static final int STATE_CONNECTING_TO_SERVER = 2;
+	private static final int STATE_CONNECTED = 3;
+	private static final int STATE_READY = 4;
+	private static final int STATE_COMMUNICATING = 5;
+	private static final int STATE_WAITING_FOR_PIN = 6;
+
+	// Timer for testing card connectivity
+	Timer timer;
+	private static final int CARD_POLL_DELAY = 2000;
 	
 	private void setState(int state) {
 		setState(state, null);
@@ -159,6 +165,9 @@ public class MainActivity extends Activity implements PINDialogListener {
         mTechLists = new String[][] { new String[] { IsoDep.class.getName() } };
 
 	    setState(STATE_IDLE);
+
+	    timer = new Timer();
+	    timer.scheduleAtFixedRate(new CardPollerTask(), CARD_POLL_DELAY, CARD_POLL_DELAY);
 	}
 
 
@@ -359,6 +368,29 @@ public class MainActivity extends Activity implements PINDialogListener {
     		lastTag = tag;
     	}    	
     }
+
+    class CardPollerTask extends TimerTask {
+    	/**
+    	 * Dirty Hack. Since android doesn't produce events when an NFC card
+    	 * is lost, we send a command to the card, and see if it still responds.
+    	 * It is important that this command does not affect the card's state.
+    	 * 
+    	 * FIXME: The command we sent is IRMA dependent, which is dangerous when
+    	 * the proxy is used with other cards/protocols.
+    	 */
+    	public void run() {
+			// Only in the ready state do we need to actively check for card
+			// presence.
+    		if(activityState == STATE_READY) {
+    			Log.i("CardPollerTask", "Checking card presence");
+				ReaderMessage rm = new ReaderMessage(
+						ReaderMessage.TYPE_COMMAND,
+						ReaderMessage.NAME_COMMAND_IDLE, "idle");
+
+				new ProcessReaderMessage().execute(new ReaderInput(lastTag, rm));
+			}
+    	}
+    }
 	
 	@Override
 	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -457,9 +489,19 @@ public class MainActivity extends Activity implements PINDialogListener {
 						}
 					}
 					return new ReaderMessage(ReaderMessage.TYPE_RESPONSE, rm.name, rm.id, new ResponseArguments(responses));
+				} else if (rm.name.equals(ReaderMessage.NAME_COMMAND_IDLE)) {
+					// FIXME: IRMA specific implementation,
+					// This command is not allowed in normal mode,
+					// so it will result in an exception.
+					Log.i("READER", "Processing idle command");
+					is.getCredentials();
 				}
 				
 			} catch (CardServiceException e) {
+				// FIXME: IRMA specific handling of failed command, this is too generic.
+				if(e.getMessage().contains("Command failed:") && e.getSW() == 0x6982) {
+					return null;
+				}
 				e.printStackTrace();
 				// TODO: maybe also include the information about the exception in the event?
 				return new ReaderMessage(ReaderMessage.TYPE_EVENT, ReaderMessage.NAME_EVENT_CARDLOST, null);
@@ -469,28 +511,39 @@ public class MainActivity extends Activity implements PINDialogListener {
 		
 		@Override
 		protected void onPostExecute(ReaderMessage result) {
-			if(activityState == STATE_COMMUNICATING) {
-				setState(STATE_READY);
+			if(result == null)
+				return;
+
+			// Update state
+			if( result.type.equals(ReaderMessage.TYPE_EVENT) &&
+				result.name.equals(ReaderMessage.NAME_EVENT_CARDLOST)) {
+				// Connection to the card is lost
+				setState(STATE_CONNECTED);
+			} else {
+				if(activityState == STATE_COMMUNICATING) {
+					setState(STATE_READY);
+				}
 			}
 
-			if (result != null) {
-				if(result.name.equals(ReaderMessage.NAME_COMMAND_AUTHPIN)) {
-					// Handle pin seperately, abort if pin incorrect and more tries left
-					PinResultArguments args = (PinResultArguments) result.arguments;
-					if(!args.success) {
-						if(args.tries > 0) {
-							// Still some tries left, asking again
-							setState(STATE_WAITING_FOR_PIN);
-							askForPIN();
-							return; // do not send a response yet.
-						} else {
-							// FIXME: No more tries left
-							// Need to go to error state
-						}
+			if (result.name.equals(ReaderMessage.NAME_COMMAND_AUTHPIN)) {
+				// Handle pin separately, abort if pin incorrect and more tries
+				// left
+				PinResultArguments args = (PinResultArguments) result.arguments;
+				if (!args.success) {
+					if (args.tries > 0) {
+						// Still some tries left, asking again
+						setState(STATE_WAITING_FOR_PIN);
+						askForPIN();
+						return; // do not send a response yet.
+					} else {
+						// FIXME: No more tries left
+						// Need to go to error state
 					}
 				}
-				postMessage(result);
 			}
+
+			// Post result to browser
+			postMessage(result);
 		}
 	}	
 

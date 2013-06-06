@@ -13,6 +13,7 @@ public class ReaderMessage {
 	public static String NAME_COMMAND_AUTHPIN = "authorizeWithPin";
 	public static String NAME_COMMAND_TRANSMIT = "transmitCommandSet";
 	public static String NAME_COMMAND_SELECTAPPLET = "selectApplet";
+	public static String NAME_COMMAND_IDLE = "idle";
 
 	public static String NAME_EVENT_CARDFOUND = "cardInserted";
 	public static String NAME_EVENT_CARDLOST = "cardRemoved";

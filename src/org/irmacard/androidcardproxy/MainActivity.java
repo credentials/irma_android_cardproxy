@@ -36,6 +36,7 @@ import android.nfc.Tag;
 import android.nfc.tech.IsoDep;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
@@ -82,29 +83,43 @@ public class MainActivity extends Activity implements PINDialogListener {
 	Timer timer;
 	private static final int CARD_POLL_DELAY = 2000;
 	
+	// Timer for briefly displaying feedback messages on CardProxy
+	CountDownTimer cdt;
+	private static final int FEEDBACK_SHOW_DELAY = 5000;
+
 	private void setState(int state) {
-		setState(state, null);
-	}
-	
-	private void setState(int state, String feedback) {
-		// TODO: this might need some work now as well?
     	Log.i(TAG,"Set state: " + state);
     	activityState = state;
+
+    	switch (activityState) {
+		case STATE_IDLE:
+			lastTag = null;
+			break;
+		default:
+			break;
+    	}
+
+    	setUIForState();
+	}
+
+    private void setUIForState() {
     	int imageResource = 0;
     	int statusTextResource = 0;
+    	int feedbackTextResource = 0;
+
     	switch (activityState) {
 		case STATE_IDLE:
 			imageResource = R.drawable.irma_icon_place_card_520px;
 			statusTextResource = R.string.status_idle;
-			lastTag = null;
 			break;
 		case STATE_CONNECTING_TO_SERVER:
 			imageResource = R.drawable.irma_icon_place_card_520px;
-			statusTextResource = R.string.connectserver;
+			statusTextResource = R.string.status_connecting;
 			break;
 		case STATE_CONNECTED:
 			imageResource = R.drawable.irma_icon_place_card_520px;
-			statusTextResource = R.string.status_waiting;
+			statusTextResource = R.string.status_connected;
+			feedbackTextResource = R.string.feedback_waiting_for_card;
 			break;
 		case STATE_READY:
 			imageResource = R.drawable.irma_icon_card_found_520px;
@@ -122,31 +137,45 @@ public class MainActivity extends Activity implements PINDialogListener {
 			break;
 		}
     	
-    	if (feedback == null) {
-    		((TextView)findViewById(R.id.statustext)).setText(statusTextResource);
-    	} else {
-    		((TextView)findViewById(R.id.statustext)).setText(feedback);
-    	}
+    	((TextView)findViewById(R.id.status_text)).setText(statusTextResource);
 		((ImageView)findViewById(R.id.statusimage)).setImageResource(imageResource);
+
+		if(feedbackTextResource != 0)
+			((TextView)findViewById(R.id.status_text)).setText(feedbackTextResource);
 	}
 	
 	private void setFeedback(String message, String state) {
     	int imageResource = 0;
 
+    	setUIForState();
+
 		if (state.equals("success")) {
 			imageResource = R.drawable.irma_icon_ok_520px;
 		} if (state.equals("warning")) {
-			imageResource = R.drawable.irma_icon_missing_520px;
-		} if (state.equals("failure")) {
 			imageResource = R.drawable.irma_icon_warning_520px;
+		} if (state.equals("failure")) {
+			imageResource = R.drawable.irma_icon_missing_520px;
 		}
 
-    	((TextView)findViewById(R.id.statustext)).setText(message);
-		((ImageView)findViewById(R.id.statusimage)).setImageResource(imageResource);
-	}
-	
+    	((TextView)findViewById(R.id.feedback_text)).setText(message);
 
-	
+    	if(imageResource != 0)
+    		((ImageView)findViewById(R.id.statusimage)).setImageResource(imageResource);
+
+		if(cdt != null)
+			cdt.cancel();
+
+		cdt = new CountDownTimer(FEEDBACK_SHOW_DELAY, 1000) {
+			public void onTick(long millisUntilFinished) {
+			}
+
+			public void onFinish() {
+				((TextView)findViewById(R.id.feedback_text)).setText("");
+				setUIForState();
+			}
+		}.start();
+	}
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);

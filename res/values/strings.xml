@@ -1,19 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
     <string name="app_name">IRMA CardProxy</string>
-    <string name="hello_world">Hello world!</string>
     <string name="menu_settings">Settings</string>
 	<string name="irmalogo">IRMA logo</string>
 	<string name="credential_info">Card Proxy</string>
-	<string name="status_waiting">Connected. Waiting for card</string>
-	<string name="status_idle">Tap to scan QR</string>
+	<string name="feedback_waiting_for_card">Waiting for card</string>
 	<string name="pinhint">PIN</string>
 	<string name="pinmessage">Please enter your IRMA pincode</string>
 	<string name="connectserver">Connecting to server</string>
+	
+	<string name="status_idle">Tap to scan QR</string>
+	<string name="status_connecting">Connecting...</string>
+	<string name="status_connected">Connected</string>
 	<string name="status_ready">Ready</string>
-	<string name="status_communicating">Communicating</string>
-	<string name="status_waitingforpin">Communicating</string>
-	
-	
+	<string name="status_communicating">Communicating...</string>
+	<string name="status_waitingforpin">Waiting for PIN</string>
 </resources>

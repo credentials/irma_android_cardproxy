@@ -28,7 +28,7 @@
         android:src="@drawable/irma_logo_150" />
 
     <TextView
-        android:id="@+id/credentialinfo"
+        android:id="@+id/status_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignLeft="@id/mainshape"
@@ -39,25 +39,24 @@
         android:text="@string/credential_info"
         android:textAppearance="?android:attr/textAppearanceLarge"
         android:textColor="@color/irmadarkblue"
-        android:textSize="24dp" />
+        android:textSize="24sp" />
 
     <TextView
-        android:id="@+id/statustext"
+        android:id="@+id/feedback_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/credentialinfo"
-        android:layout_below="@+id/credentialinfo"
+        android:layout_alignLeft="@+id/status_text"
+        android:layout_below="@+id/status_text"
         android:gravity="center"
-        android:text="@string/status_waiting"
         android:textAppearance="?android:attr/textAppearanceLarge"
         android:textColor="@color/irmadarkblue"
-        android:textSize="20dp" />
+        android:textSize="20sp" />
 
     <ImageView
         android:id="@+id/statusimage"
         android:layout_width="150dp"
         android:layout_height="150dp"
-        android:layout_below="@+id/statustext"
+        android:layout_below="@+id/feedback_text"
         android:layout_centerHorizontal="true"
         android:layout_marginTop="23dp"
         android:src="@drawable/irma_icon_place_card_520px" />

@@ -85,7 +85,7 @@ public class MainActivity extends Activity implements PINDialogListener {
 	
 	// Timer for briefly displaying feedback messages on CardProxy
 	CountDownTimer cdt;
-	private static final int FEEDBACK_SHOW_DELAY = 5000;
+	private static final int FEEDBACK_SHOW_DELAY = 15000;
 
 	private void setState(int state) {
     	Log.i(TAG,"Set state: " + state);
@@ -248,7 +248,7 @@ public class MainActivity extends Activity implements PINDialogListener {
 					@Override
 					public void onSuccess(int arg0, String responseData) {
 						if (!responseData.equals("")) {
-							Toast.makeText(MainActivity.this, responseData, Toast.LENGTH_SHORT).show();
+							//Toast.makeText(MainActivity.this, responseData, Toast.LENGTH_SHORT).show();
 							handleChannelData(responseData);
 						}
 						

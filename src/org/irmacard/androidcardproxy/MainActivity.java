@@ -88,6 +88,10 @@ public class MainActivity extends Activity implements PINDialogListener {
 	private static final int FEEDBACK_SHOW_DELAY = 10000;
 	private boolean showingFeedback = false;
 
+	// Counter for number of connection tries
+	private static final int MAX_RETRIES = 3;
+	private int retry_counter = 0;
+
 	private void setState(int state) {
     	Log.i(TAG,"Set state: " + state);
     	activityState = state;
@@ -268,14 +272,24 @@ public class MainActivity extends Activity implements PINDialogListener {
 					}
 					@Override
 					public void onFailure(Throwable arg0, String arg1) {
-						Toast.makeText(MainActivity.this, "Unable to connect, retrying...", Toast.LENGTH_SHORT).show();
-						// TODO: retry only a certain number of times (3?) and then return to STATE_IDLE
+						if(activityState != STATE_CONNECTING_TO_SERVER) {
+							retry_counter = 0;
+							return;
+						}
+
+						retry_counter += 1;
+
 						// We should try again, but only if no new requests have started
 						// and we should wait a bit longer
-						if (currentHandlers <= 1) {
+						if (currentHandlers <= 1 && retry_counter < MAX_RETRIES) {
 							Message newMsg = new Message();
+							setFeedback("Trying to reach server again...", "none");
 							newMsg.what = MESSAGE_STARTGET;
 							handler.sendMessageDelayed(newMsg, 5000);
+						} else {
+							retry_counter = 0;
+							setFeedback("Failed to connect to server", "warning");
+							setState(STATE_IDLE);
 						}
 						
 					}

@@ -257,7 +257,8 @@ public class MainActivity extends Activity implements PINDialogListener {
 						if (currentHandlers <= 1) {
 							Message newMsg = new Message();
 							newMsg.what = MESSAGE_STARTGET;
-							handler.sendMessageDelayed(newMsg, 200);
+							if(!(activityState == STATE_IDLE))
+									handler.sendMessageDelayed(newMsg, 200);
 						}
 					}
 					@Override
@@ -323,7 +324,7 @@ public class MainActivity extends Activity implements PINDialogListener {
 				Log.i(TAG, "Got command message");
 
 				if (activityState != STATE_READY) {
-					// Only when ready can we handle commands
+					// FIXME: Only when ready can we handle commands
 					throw new RuntimeException(
 							"Illegal command from server, no card currently connected");
 				}
@@ -342,6 +343,8 @@ public class MainActivity extends Activity implements PINDialogListener {
 					if (state != null) {
 						setFeedback(feedback, state);
 					}
+				} else if(rm.name.equals(ReaderMessage.NAME_EVENT_TIMEOUT)) {
+					setState(STATE_IDLE);
 				}
 			}
 		}
@@ -488,6 +491,13 @@ public class MainActivity extends Activity implements PINDialogListener {
 			ReaderInput input = params[0];
 			IsoDep tag = input.tag;
 			ReaderMessage rm = input.message;
+
+			// It seems sometimes tag is null afterall
+			if(tag == null) {
+				Log.e("ReaderMessage", "tag is null, this should not happen!");
+				return new ReaderMessage(ReaderMessage.TYPE_EVENT, ReaderMessage.NAME_EVENT_CARDLOST, null);
+			}
+
 			// Make sure time-out is long enough (10 seconds)
 			tag.setTimeout(10000);
 			
@@ -534,6 +544,10 @@ public class MainActivity extends Activity implements PINDialogListener {
 				e.printStackTrace();
 				// TODO: maybe also include the information about the exception in the event?
 				return new ReaderMessage(ReaderMessage.TYPE_EVENT, ReaderMessage.NAME_EVENT_CARDLOST, null);
+			} catch (IllegalStateException e) {
+				// This sometimes props up when applications comes out of suspend for now we just ignore this.
+				Log.i("READER", "IllegalStateException ignored");
+				return null;
 			}
 			return null;
 		}

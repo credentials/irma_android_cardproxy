@@ -19,6 +19,7 @@ public class ReaderMessage {
 	public static String NAME_EVENT_CARDLOST = "cardRemoved";
 	public static String NAME_EVENT_CARDREADERFOUND = "cardReaderFound";
 	public static String NAME_EVENT_STATUSUPDATE = "statusUpdate";
+	public static String NAME_EVENT_TIMEOUT = "timeout";
 
 	public ReaderMessage(String type, String name) {
 		this.type = type;

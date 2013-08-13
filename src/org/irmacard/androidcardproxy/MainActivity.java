@@ -178,11 +178,15 @@ public class MainActivity extends Activity implements PINDialogListener {
 			}
 
 			public void onFinish() {
-				showingFeedback = false;
-				((TextView)findViewById(R.id.feedback_text)).setText("");
-				setUIForState();
+				clearFeedback();
 			}
 		}.start();
+	}
+
+	private void clearFeedback() {
+		showingFeedback = false;
+		((TextView)findViewById(R.id.feedback_text)).setText("");
+		setUIForState();
 	}
 
 	@Override
@@ -651,6 +655,21 @@ public class MainActivity extends Activity implements PINDialogListener {
 				}
 			});
 			return builder.create();
+		}
+	}
+
+	@Override
+	public void onBackPressed() {
+		// When we are not in IDLE state, return there
+		if(activityState != STATE_IDLE) {
+			if(cdt != null)
+				cdt.cancel();
+
+			setState(STATE_IDLE);
+			clearFeedback();
+		} else {
+			// We are in Idle, do what we always do
+			super.onBackPressed();
 		}
 	}
 }

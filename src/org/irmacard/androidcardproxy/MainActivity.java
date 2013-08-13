@@ -350,6 +350,8 @@ public class MainActivity extends Activity implements PINDialogListener {
 					}
 				} else if(rm.name.equals(ReaderMessage.NAME_EVENT_TIMEOUT)) {
 					setState(STATE_IDLE);
+				} else if(rm.name.equals(ReaderMessage.NAME_EVENT_DONE)) {
+					setState(STATE_IDLE);
 				}
 			}
 		}

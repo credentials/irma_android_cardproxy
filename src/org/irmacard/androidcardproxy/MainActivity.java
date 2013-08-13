@@ -85,7 +85,8 @@ public class MainActivity extends Activity implements PINDialogListener {
 	
 	// Timer for briefly displaying feedback messages on CardProxy
 	CountDownTimer cdt;
-	private static final int FEEDBACK_SHOW_DELAY = 15000;
+	private static final int FEEDBACK_SHOW_DELAY = 10000;
+	private boolean showingFeedback = false;
 
 	private void setState(int state) {
     	Log.i(TAG,"Set state: " + state);
@@ -138,7 +139,8 @@ public class MainActivity extends Activity implements PINDialogListener {
 		}
     	
     	((TextView)findViewById(R.id.status_text)).setText(statusTextResource);
-		((ImageView)findViewById(R.id.statusimage)).setImageResource(imageResource);
+    	if(!showingFeedback)
+    		((ImageView)findViewById(R.id.statusimage)).setImageResource(imageResource);
 
 		if(feedbackTextResource != 0)
 			((TextView)findViewById(R.id.status_text)).setText(feedbackTextResource);
@@ -159,8 +161,10 @@ public class MainActivity extends Activity implements PINDialogListener {
 
     	((TextView)findViewById(R.id.feedback_text)).setText(message);
 
-    	if(imageResource != 0)
+    	if(imageResource != 0) {
     		((ImageView)findViewById(R.id.statusimage)).setImageResource(imageResource);
+    		showingFeedback = true;
+    	}
 
 		if(cdt != null)
 			cdt.cancel();
@@ -170,6 +174,7 @@ public class MainActivity extends Activity implements PINDialogListener {
 			}
 
 			public void onFinish() {
+				showingFeedback = false;
 				((TextView)findViewById(R.id.feedback_text)).setText("");
 				setUIForState();
 			}

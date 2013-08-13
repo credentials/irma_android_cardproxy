@@ -43,11 +43,14 @@
 
     <TextView
         android:id="@+id/feedback_text"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignLeft="@+id/status_text"
         android:layout_below="@+id/status_text"
-        android:gravity="center"
+        android:layout_marginRight="31dp"
+        android:paddingTop="5sp"
+        android:paddingRight="5sp"
+        android:gravity="left"
         android:textAppearance="?android:attr/textAppearanceLarge"
         android:textColor="@color/irmadarkblue"
         android:textSize="20sp" />

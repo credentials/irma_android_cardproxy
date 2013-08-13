@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="match_parent"
+    android:background="@color/irmadarkblue"
+    android:onClick="onMainTouch">
+
+    <ImageView
+        android:id="@+id/mainshape"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:layout_alignParentLeft="true"
+        android:layout_marginBottom="100dp"
+        android:layout_marginLeft="61dp"
+        android:layout_marginRight="61dp"
+        android:layout_marginTop="100dp"
+        android:src="@drawable/whiteshaperounded" />
+
+    <ImageView
+        android:id="@+id/irmaLogo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginLeft="10dp"
+        android:layout_marginTop="50dp"
+        android:contentDescription="@string/irmalogo"
+        android:src="@drawable/irma_logo_300" />
+
+    <TextView
+        android:id="@+id/status_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@id/statusimage"
+        android:layout_below="@+id/irmaLogo"
+        android:layout_marginTop="5dp"
+        android:gravity="center"
+        android:text="@string/credential_info"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:textColor="@color/irmadarkblue"
+        android:textSize="36sp" />
+
+    <TextView
+        android:id="@+id/feedback_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/status_text"
+        android:layout_below="@+id/status_text"
+        android:layout_marginRight="61dp"
+        android:paddingTop="5sp"
+        android:paddingRight="5sp"
+        android:gravity="left"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:textColor="@color/irmadarkblue"
+        android:textSize="24sp" />
+
+    <ImageView
+        android:id="@+id/statusimage"
+        android:layout_below="@+id/feedback_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="23dp"
+        android:src="@drawable/irma_icon_place_card_520px" />
+
+</RelativeLayout>

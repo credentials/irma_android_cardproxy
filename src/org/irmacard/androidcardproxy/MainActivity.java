@@ -488,7 +488,8 @@ public class MainActivity extends Activity implements PINDialogListener {
 	
 	public void startQRScanner(String message) {
 		IntentIntegrator integrator = new IntentIntegrator(this);
-    	integrator.initiateScan(IntentIntegrator.QR_CODE_TYPES, message);
+		integrator.setPrompt(message);
+    	integrator.initiateScan();
 	}
 	
 	

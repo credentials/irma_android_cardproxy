@@ -1,0 +1,68 @@
+apply plugin: 'com.android.application'
+apply plugin: 'maven'
+
+version="0.8"
+group="org.irmacard"
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:0.13.0'
+    }
+}
+
+repositories {
+    mavenLocal()
+    maven {
+        url "https://credentials.github.io/repos/maven2/"
+    }
+
+    // Use this to get minimal android library
+    maven {
+        url "https://raw.github.com/embarkmobile/zxing-android-minimal/mvn-repo/maven-repository/"
+    }
+    mavenCentral()
+}
+
+android {
+    compileSdkVersion 19
+    buildToolsVersion "19.1"
+
+    sourceSets {
+        main {
+            manifest.srcFile 'AndroidManifest.xml'
+            java.srcDirs = ['src']
+            resources.srcDirs = ['src']
+            res.srcDirs = ['res']
+            assets.srcDirs = ['assets']
+        }
+    }
+
+    lintOptions {
+        // BCProv references javax.naming
+        // CredentialsAPI references java.awt and java.swing
+        disable 'InvalidPackage'
+    }
+}
+
+dependencies {
+    compile 'com.loopj.android:android-async-http:1.4.3'
+    compile 'com.android.support:support-v4:19.1.0'
+    compile 'com.google.code.gson:gson:2.2.2'
+
+    // zxing QR code libraries
+    compile 'com.embarkmobile:zxing-android-minimal:2.0.0@aar'
+    compile 'com.embarkmobile:zxing-android-integration:2.0.0@aar'
+    compile 'com.google.zxing:core:3.0.1'
+
+    compile "org.irmacard.android:irma_android_library:0.8"
+    compile 'net.sourceforge.scuba:scuba_sc_android:0.0.3'
+    
+    compile 'net.sourceforge.scuba:scuba_smartcards:0.0.3'
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.1'
+}

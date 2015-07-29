@@ -1,6 +1,6 @@
 package org.irmacard.androidcardproxy.messages;
 
-import net.sourceforge.scuba.smartcards.ProtocolCommands;
+import net.sf.scuba.smartcards.ProtocolCommands;
 
 public class TransmitCommandSetArguments extends ReaderMessageArguments {
 

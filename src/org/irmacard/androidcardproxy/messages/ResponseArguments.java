@@ -1,6 +1,6 @@
 package org.irmacard.androidcardproxy.messages;
 
-import net.sourceforge.scuba.smartcards.ProtocolResponses;
+import net.sf.scuba.smartcards.ProtocolResponses;
 
 public class ResponseArguments extends ReaderMessageArguments {
 	public String result = null;

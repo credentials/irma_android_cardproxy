@@ -5,12 +5,12 @@ import java.io.UnsupportedEncodingException;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import net.sourceforge.scuba.smartcards.CardServiceException;
-import net.sourceforge.scuba.smartcards.IsoDepCardService;
-import net.sourceforge.scuba.smartcards.ProtocolCommand;
-import net.sourceforge.scuba.smartcards.ProtocolResponse;
-import net.sourceforge.scuba.smartcards.ProtocolResponses;
-import net.sourceforge.scuba.smartcards.ResponseAPDU;
+import net.sf.scuba.smartcards.CardServiceException;
+import net.sf.scuba.smartcards.IsoDepCardService;
+import net.sf.scuba.smartcards.ProtocolCommand;
+import net.sf.scuba.smartcards.ProtocolResponse;
+import net.sf.scuba.smartcards.ProtocolResponses;
+import net.sf.scuba.smartcards.ResponseAPDU;
 import org.apache.http.entity.StringEntity;
 import org.irmacard.android.util.pindialog.EnterPINDialogFragment;
 import org.irmacard.android.util.pindialog.EnterPINDialogFragment.PINDialogListener;

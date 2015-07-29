@@ -4,3 +4,5 @@ gen/
 .settings
 build/
 .gradle/
+*.iml
+.idea/
